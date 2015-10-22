@@ -53,6 +53,7 @@ import boto.iam
 from boto.handler import XmlHandler as BotoXmlHandler
 from boto.regioninfo import RegionInfo
 from boto.sts.credentials import Credentials
+from boto.sts.connection import STSConnection
 from pyramid.security import Authenticated, authenticated_userid
 from .admin import EucalyptusAdmin
 
@@ -200,6 +201,9 @@ class ConnectionManager(object):
             elif conn_type == 'iam':
                 path = 'Euare'
                 conn_class = boto.iam.IAMConnection
+            elif conn_type == 'sts':
+                path = 'Tokens'
+                conn_class = STSConnection
             elif conn_type == 's3':
                 path = 'objectstorage'
                 conn_class = S3Connection
