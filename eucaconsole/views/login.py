@@ -64,24 +64,39 @@ class PermissionCheckMixin(object):
         sts_conn = self.get_connection(
             conn_type='sts', cloud_type='euca', region='euca',
             access_key=creds.access_key, secret_key=creds.secret_key, security_token=creds.session_token)
-        account = session['account']
         # default permissions to false unless we find a persona to enable it
-        session['account_access'] = False
-        #TODO: since peronsas aren't so fine grained, convert these 3 to single access boolean
-        session['user_access'] = False
-        session['group_access'] = False
-        session['role_access'] = False
+        session['personas'] = []
         for persona in SYSTEM_PERSONAS:
             try:
                 sts_conn.assume_role(persona['arn'], persona['name'])
-                if persona['name'] == 'AccoutAdmin':
-                    session['account_access'] = True
-                elif persona['name'] == 'ResourceAdmin':
-                    session['user_access'] = True
-                    session['group_access'] = True
-                    session['role_access'] = True
-            except BotoServerError:
+                session['personas'].append(persona['name'])
+            except BotoServerError as err:
+                import pdb; pdb.set_trace()
                 pass  # if we can't assume role, don't panic.. just move on
+
+        iam_conn = self.get_connection(
+            conn_type='iam', cloud_type='euca', region='euca',
+            access_key=creds.access_key, secret_key=creds.secret_key, security_token=creds.session_token)
+        account = session['account']
+        session['account_access'] = True if account == 'eucalyptus' else False
+        session['user_access'] = False
+        try:
+            iam_conn.get_all_users(path_prefix="/notlikely")
+            session['user_access'] = True
+        except BotoServerError:
+            pass
+        session['group_access'] = False
+        try:
+            iam_conn.get_all_groups(path_prefix="/notlikely")
+            session['group_access'] = True
+        except BotoServerError:
+            pass
+        session['role_access'] = False
+        try:
+            iam_conn.list_roles(path_prefix="/notlikely")
+            session['role_access'] = True
+        except BotoServerError:
+            pass
 
 
 class LoginView(BaseView, PermissionCheckMixin):
