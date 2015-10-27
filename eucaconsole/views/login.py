@@ -68,7 +68,8 @@ class PermissionCheckMixin(object):
         session['personas'] = []
         for persona in SYSTEM_PERSONAS:
             try:
-                sts_conn.assume_role(persona['arn'], persona['name'], duration=900)
+                sts_conn.assume_role(persona['arn'], persona['name'], duration_seconds=900)
+                import pdb; pdb.set_trace()
                 session['personas'].append(persona['name'])
             except BotoServerError as err:
                 pass  # if we can't assume role, don't panic.. just move on
