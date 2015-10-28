@@ -112,6 +112,7 @@ class BaseView(object):
         self.secret_key = request.session.get('secret_key')
         self.cloud_type = request.session.get('cloud_type')
         self.security_token = request.session.get('session_token')
+        self.personas = request.session.get('personas')
         self.euca_logout_form = EucaLogoutForm(self.request)
 
     def get_connection(self, conn_type='ec2', cloud_type=None, region=None, access_key=None,
@@ -142,7 +143,7 @@ class BaseView(object):
             dns_enabled = self.request.session.get('dns_enabled', True)
             conn = ConnectionManager.euca_connection(
                 host, port, access_key, secret_key, security_token,
-                conn_type, dns_enabled, validate_certs, certs_file
+                conn_type, dns_enabled, validate_certs, certs_file, self.personas or []
             )
 
         return conn
