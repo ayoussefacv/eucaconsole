@@ -291,9 +291,20 @@ class VolumeView(TaggedItemView, BaseVolumeView):
         self.attach_data = self.volume.attach_data if self.volume else None
         self.volume_name = self.get_volume_name()
         self.instance_name = None
+
         if self.attach_data is not None and self.attach_data.instance_id is not None:
             instance = self.get_instance(self.attach_data.instance_id)
             self.instance_name = TaggedItemView.get_display_name(instance)
+
+        if self.volume is not None:
+            tags = [{
+                'name': key,
+                'value': val
+            } for key, val in self.volume.tags.iteritems()]
+        else:
+            tags = []
+        tags = BaseView.escape_json(json.dumps(tags))
+
         self.render_dict = dict(
             volume=self.volume,
             volume_name=self.volume_name,
@@ -305,6 +316,7 @@ class VolumeView(TaggedItemView, BaseVolumeView):
             attach_form=self.attach_form,
             detach_form=self.detach_form,
             controller_options_json=self.get_controller_options_json(),
+            tags=tags,
         )
 
     @view_config(route_name='volume_view', renderer=VIEW_TEMPLATE, request_method='GET')
@@ -347,6 +359,7 @@ class VolumeView(TaggedItemView, BaseVolumeView):
             zone = self.request.params.get('zone')
             snapshot_id = self.request.params.get('snapshot_id')
             kwargs = dict(size=size, zone=zone)
+
             if snapshot_id:
                 snapshot = self.get_snapshot(snapshot_id)
                 kwargs['snapshot'] = snapshot

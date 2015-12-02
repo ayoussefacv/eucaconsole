@@ -12,6 +12,10 @@ angular.module('TagEditorModule', ['EucaConsoleUtils'])
                 return attributes.template;
             },
             controller: ['$scope', function ($scope) {
+                $scope.isValid = function () {
+                    return;
+                };
+
                 $scope.addTag = function () {
                     if(!$scope.tagForm.$valid) {
                         return
@@ -59,6 +63,9 @@ angular.module('TagEditorModule', ['EucaConsoleUtils'])
             require: 'ngModel',
             link: function (scope, element, attrs, ctrl) {
                 ctrl.$validators.tagName = function (modelValue, viewValue) {
+                    if(ctrl.$isEmpty(modelValue)) {
+                        return true;
+                    }
                     return validPattern.test(viewValue);
                 };
             }

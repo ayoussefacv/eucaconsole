@@ -4,11 +4,12 @@
  *
  */
 
-angular.module('VolumePage', ['TagEditor', 'EucaConsoleUtils'])
+angular.module('VolumePage', ['TagEditorModule', 'EucaConsoleUtils'])
     .controller('VolumePageCtrl', function ($scope, $http, $timeout, eucaUnescapeJson, eucaHandleError) {
+        var transitionalStates = ['creating', 'deleting', 'attaching', 'detaching'];
+        var volumeStatusEndpoint = '';
+
         $http.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
-        $scope.volumeStatusEndpoint = '';
-        $scope.transitionalStates = ['creating', 'deleting', 'attaching', 'detaching'];
         $scope.volumeStatus = '';
         $scope.volumeAttachStatus = '';
         $scope.snapshotId = '';
@@ -22,22 +23,25 @@ angular.module('VolumePage', ['TagEditor', 'EucaConsoleUtils'])
         $scope.snapshotSize = 1;
         $scope.urlParams = $.url().param();
         $scope.pendingModalID = '';
+
         $scope.initController = function (optionsJson) {
             var options = JSON.parse(eucaUnescapeJson(optionsJson));
             $scope.initChosenSelectors();
             $scope.initAvailZoneChoice();
-            $scope.volumeStatusEndpoint = options.volume_status_json_url;
+            volumeStatusEndpoint = options.volume_status_json_url;
             $scope.volumeStatus = options.volume_status ? options.volume_status.replace('-', ' ') : '';
             $scope.volumeAttachStatus = options.attach_status;
-            if ($scope.volumeStatusEndpoint) {
+            if (volumeStatusEndpoint) {
                 $scope.getVolumeState();
             }
             $scope.setWatch();
             $scope.setFocus();
         };
+
         $scope.isTransitional = function (state) {
-            return $scope.transitionalStates.indexOf(state) !== -1;
+            return transitionalStates.indexOf(state) !== -1;
         };
+
         $scope.populateVolumeSize = function () {
            if ($scope.snapshotId === '') {
                 $scope.snapshotSize = 1;
@@ -54,6 +58,7 @@ angular.module('VolumePage', ['TagEditor', 'EucaConsoleUtils'])
                 eucaHandleError(oData, status);
             });
         };
+
         $scope.initChosenSelectors = function () {
             var snapshotField = $('#snapshot_id');
             if ($scope.urlParams.from_snapshot) {  // Pre-populate snapshot if passed in query string arg
@@ -68,14 +73,16 @@ angular.module('VolumePage', ['TagEditor', 'EucaConsoleUtils'])
                 $('#instance_id').chosen({'width': '75%', search_contains: true});
             });
         };
+
         $scope.initAvailZoneChoice = function () {
             var availZoneParam = $scope.urlParams.avail_zone;
             if (availZoneParam) {
                 $('#zone').val(availZoneParam);
             }
         };
+
         $scope.getVolumeState = function () {
-            $http.get($scope.volumeStatusEndpoint).success(function(oData) {
+            $http.get(volumeStatusEndpoint).success(function(oData) {
                 var results = oData ? oData.results : '';
                 if (results) {
                     $scope.volumeStatus = results.volume_status;
