@@ -1463,6 +1463,7 @@ class InstanceCreateImageView(BaseInstanceView, BlockDeviceMappingItemView):
             create_image_form=self.create_image_form,
             create_bucket_form=self.create_bucket_form,
             controller_options_json=controller_options_json,
+            tags=[]
         )
 
     @view_config(route_name='instance_create_image', renderer=TEMPLATE, request_method='GET')
@@ -1535,7 +1536,10 @@ class InstanceCreateImageView(BaseInstanceView, BlockDeviceMappingItemView):
                         'tags': tags_json,
                         'bundle_id': result.id,
                     }
-                    self.ec2_conn.create_tags(instance_id, {'ec_bundling': '%s/%s' % (s3_bucket, result.id)})
+                    self.ec2_conn.create_tags(
+                        instance_id, {
+                            'ec_bundling': '%s/%s' % (s3_bucket, result.id)})
+
                     s3_conn = self.get_connection(conn_type='s3')
                     k = Key(s3_conn.get_bucket(s3_bucket))
                     k.key = result.id
@@ -1553,6 +1557,7 @@ class InstanceCreateImageView(BaseInstanceView, BlockDeviceMappingItemView):
                     image_id = self.ec2_conn.create_image(
                         instance_id, name, description=description, no_reboot=no_reboot, block_device_mapping=bdm)
                     tags = json.loads(tags_json)
+                    tags = TaggedItemView.normalize_tags(tags)
                     self.ec2_conn.create_tags(image_id, tags)
                     msg = _(u'Successfully sent create image request.  It may take a few minutes to create the image.')
                     self.invalidate_images_cache()

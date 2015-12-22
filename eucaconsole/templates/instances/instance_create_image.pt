@@ -2,6 +2,7 @@
 
 <head metal:fill-slot="head_css">
     <link rel="stylesheet" type="text/css" href="${request.static_path('eucaconsole:static/css/pages/instance_create_image.css')}" />
+    <link rel="stylesheet" type="text/css" href="${request.static_path('eucaconsole:static/css/widgets/tag-editor.css')}" />
 </head>
 
 <div metal:fill-slot="main_content">
@@ -48,7 +49,11 @@
                         ${panel('form_field', field=create_image_form['s3_prefix'], leftcol_width=3, rightcol_width=9, ng_attrs={'model': 's3_prefix'}, pattern='^[a-z0-9\-\.]+$')}
                     </div>
                     <hr/>
-                    ${panel('tag_editor', leftcol_width=3, rightcol_width=9)}
+                    <tag-editor
+                            ng-model="tags"
+                            template="${request.route_path('tag_editor_template')}"
+                            tal:content="tags | structure">
+                    </tag-editor>
                     <hr tal:condition="isEBS"/>
                     <div class="expando" id="advanced-section" ng-cloak="" tal:condition="isEBS">
                         <h6 class="title" >
@@ -153,6 +158,7 @@
         </div>
     </div>
     <script src="${request.static_path('eucaconsole:static/js/widgets/create_bucket_dialog.js')}"></script>
+    <script src="${request.static_path('eucaconsole:static/js/widgets/tag-editor/tag-editor.js')}"></script>
 </div>
 
 </metal:block>

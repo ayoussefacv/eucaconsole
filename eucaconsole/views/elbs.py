@@ -549,7 +549,7 @@ class BaseELBView(TaggedItemView):
 
     def add_elb_tags(self, elb_name):
         tags_json = self.request.params.get('tags', '{}')
-        tags_dict = self._normalize_tags(json.loads(tags_json))
+        tags_dict = TaggedItemView.normalize_tags(json.loads(tags_json))
         add_tags_params = {'LoadBalancerNames.member.1': elb_name}
         index = 1
         for key, value in tags_dict.items():

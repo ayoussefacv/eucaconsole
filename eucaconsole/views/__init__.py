@@ -461,10 +461,10 @@ class TaggedItemView(BaseView):
         self.tagged_obj = None
         self.conn = None
 
-    def add_tags(self):
+    def add_tags(self, connection=None):
         if self.conn:
             tags_json = self.request.params.get('tags', '{}')
-            tags_dict = self._normalize_tags(json.loads(tags_json))
+            tags_dict = TaggedItemView.normalize_tags(json.loads(tags_json))
             tags = {}
             for key, value in tags_dict.items():
                 key = self.unescape_braces(key.strip())
@@ -495,7 +495,8 @@ class TaggedItemView(BaseView):
                     tag_value = self.unescape_braces(value)
                     self.tagged_obj.add_tag('Name', tag_value)
 
-    def _normalize_tags(self, tags):
+    @staticmethod
+    def normalize_tags(tags):
         if type(tags) is dict:
             return tags
 
