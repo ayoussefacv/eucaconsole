@@ -703,6 +703,7 @@ class LandingPageView(BaseView):
 @notfound_view_config(renderer='../templates/notfound.pt')
 def notfound_view(request):
     """404 Not Found view"""
+    request.response.status = 404
     return dict()
 
 
