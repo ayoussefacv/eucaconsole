@@ -378,14 +378,7 @@ urls = [
     Route(name='stack_state_json', pattern='/stacks/{name}/state/json'),
     Route(name='stack_template', pattern='/stacks/{name}/template'),
     Route(name='stack_events', pattern='/stacks/{name}/events'),
-<<<<<<< HEAD
-=======
     # Update
     Route(name='stack_update', pattern='/stacks/{name}/update'),
-    Route(name='stack_aws_dialogs', pattern='/templates/aws-dialogs'),
-
-    # Tag Editor #####
-    # Directive Template
-    Route(name='tag_editor_template', pattern='/templates/tag-editor'),
->>>>>>> 06673bed79b583fa383ff67e5c7b1a84a122625c
+    Route(name='stack_aws_dialogs', pattern='/templates/aws-dialogs')
 ]
