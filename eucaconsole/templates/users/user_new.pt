@@ -1,6 +1,7 @@
 <metal:block use-macro="main_template" i18n:domain="eucaconsole">
 
 <head metal:fill-slot="head_css">
+    <link rel="stylesheet" href="${request.static_path('eucaconsole:static/css/widgets/user_editor.css')}" />
 </head>
 
 <div metal:fill-slot="main_content">
@@ -21,7 +22,7 @@
         <h3 id="pagetitle">
             <strong i18n:translate="">Create new users</strong>
         </h3>
-        <div class="large-7 columns">
+        <div class="large-12 columns">
             <div class="panel no-title">
                 <form id="user-new-form" ng-submit="submit($event)" data-abide="abide">
                     ${structure:user_form['csrf_token']}
@@ -61,7 +62,7 @@
                             </a>
                         </h6>
                         <div class="advance-content" ng-show="adv_expanded">
-                            ${panel('form_field', field=user_form['path'], leftcol_width=2, rightcol_width=10)}
+                            ${panel('form_field', field=user_form['path'], leftcol_width=2, rightcol_width=10, leftcol_width_large=1, rightcol_width_large=11)}
                         </div>
                     </div>
                     <hr />
@@ -86,7 +87,7 @@
                 </form>
             </div>
         </div>
-        <div class="large-5 columns">
+        <div class="large-12 columns">
             <metal:block metal:use-macro="layout.global_macros['help_expando']" />
             <div class="help-content" ng-show="isHelpExpanded" ng-cloak="">
                 <!--! HELP CONTENT HERE -->

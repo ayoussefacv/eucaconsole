@@ -7,3 +7,12 @@
     padding-right: 10px;
 }
 
+.panel {
+    overflow: hidden;
+    min-height: 400px;
+}
+
+/* override for height of template view dialog */
+.CodeMirror {
+    height: 450px;
+}

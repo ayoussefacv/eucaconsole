@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2013-2014 Eucalyptus Systems, Inc.
+# Copyright 2013-2015 Hewlett Packard Enterprise Development LP
 #
 # Redistribution and use of this software in source and binary forms,
 # with or without modification, are permitted provided that the following
@@ -85,13 +85,35 @@ class BucketUploadForm(BaseSecureForm):
     pass
 
 
+class BucketItemSharedURLForm(BaseSecureForm):
+    """Form for generating a pre-signed shared URL with an expiration timestamp"""
+    expiration = wtforms.SelectField(label=_(u'URL expires in'))
+
+    def __init__(self, request, **kwargs):
+        super(BucketItemSharedURLForm, self).__init__(request, **kwargs)
+        self.expiration.choices = self.get_expiration_choices()
+
+    @staticmethod
+    def get_expiration_choices():
+        hour = 3600
+        return [
+            (300, _('5 minutes')),
+            (1800, _('30 minutes')),
+            (hour, _('1 hour')),
+            (hour * 24, _('1 day')),
+            (hour * 24 * 7, _('1 week')),
+        ]
+
+
 class SharingPanelForm(BaseSecureForm):
     """S3 Sharing Panel form for buckets/objects"""
     share_account_error_msg = _(
         u'Account ID may contain alpha-numeric characters and is a 12-digit account ID or the 64-digit canonical ID.')
     share_account_helptext = _(
-        u"Enter an account ID or a user's email address. If you enter an email address, "
-        u"sharing will be extended to all users in their account."
+        u"'Authenticated users' requires login credentials and is a more secure option "
+        u"than granting access to anyone with the URL. You may also "
+        u"directly enter an account ID or a user's email address. If you enter an email "
+        u"address, sharing will be extended to all users in their account. "
     )
     share_account = TextEscapedField(label=_(u'Grantee'))
     share_permissions = wtforms.SelectField(label=_(u'Permission'))
@@ -175,8 +197,9 @@ class MetadataForm(BaseSecureForm):
 
 class CreateBucketForm(BaseSecureForm):
     """S3 Create Bucket form"""
+    BUCKET_NAME_PATTERN = '^[a-z0-9-\.]+$'
     bucket_name_error_msg = _(
-        'Name is required and may contain lowercase letters, numbers, hyphens, and/or dots')
+        'Name is required and may only contain lowercase letters, numbers, hyphens, and/or dots')
     bucket_name = TextEscapedField(
         label=_(u'Name'),
         validators=[

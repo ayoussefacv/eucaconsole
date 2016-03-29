@@ -2,6 +2,9 @@
 Eucalyptus Management Console
 =============================
 
+.. image:: https://travis-ci.org/eucalyptus/eucaconsole.svg?branch=master
+    :target: https://travis-ci.org/eucalyptus/eucaconsole
+
 The Eucalyptus Management Console is a web-based interface to a local Eucalyptus cloud and/or AWS services.
 
 
@@ -46,8 +49,9 @@ Fedora:
 
 OS X:
 
-Install homebrew, then run `brew install libevent openssl swig libmagic memcached libmemcached`
+Install homebrew, then run
 
+    `brew install libevent openssl swig libmagic memcached libmemcached`
 
 Pyramid Setup
 -------------
@@ -110,6 +114,27 @@ Run the server with
     ./launcher.sh
 
 `launcher.sh` is provided as an alias for `pserve console.ini --reload`
+
+
+Compilation Issues on OS X
+--------------------------
+On OS X (Yosemite and El Capitan), you may encounter issues installing M2Crypto and/or gevent.
+
+There is a known bug in the M2Crypto bindings and swig versions greater than 3.0.4.
+Using Homebrew you may install swig 3.0.4...
+
+::
+
+    brew uninstall swig
+    brew install homebrew/versions/swig304
+    python setup.py develop
+    ./launcher.sh
+
+If there are issues with M2Crypto locating the OpenSSL libraries (which could happen after an XCode update),
+reinstall the XCode Command Line Tools  via `xcode-select --install`
+
+If gevent has trouble compiling, use `CFLAGS='-std=c99' pip install gevent` as a workaround
+
 
 
 Running the server in development/debug mode
@@ -221,6 +246,14 @@ Secondary Components
 * WTForms (server-side forms and validation)
 
 
+Guitester - selenium testing framework for eucaconsole
+======================================================
+* Location: tests/selenium/guiops
+* Requirements: python selenium module, an instance of selenium webdriver
+* Setup and intro: https://github.com/eucalyptus/eucaconsole/wiki/Guitester 
+* Contributing: https://github.com/eucalyptus/eucaconsole/wiki/Contributing-to-Guitester
+
+
 Grunt - JavaScript Task Manager
 ===============================
 
@@ -244,7 +277,7 @@ to install npm packages listed in the file `package.json`
 to allow grunt cli to run
 
 Grunt Task File
-------------------------
+---------------
 ::
 
     Gruntfile.js
@@ -260,6 +293,7 @@ Grunt Commands
 ::
 
     grunt bowercopy
+
 * Karma:
 ::
 

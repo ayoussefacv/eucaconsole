@@ -45,6 +45,9 @@ angular.module('S3SharingPanel', ['EucaConsoleUtils'])
                 create_with_enter: true,
                 create_option_text: $scope.createOptionText
             });
+            $('#share_permissions').chosen({
+                search_contains: true
+            });
         };
         $scope.addListeners = function () {
             $(document).ready(function() {
@@ -67,6 +70,11 @@ angular.module('S3SharingPanel', ['EucaConsoleUtils'])
                         $scope.addAccountBtnDisabled = that.val() === '';
                     });
                 });
+            });
+            $scope.$watch('propagateAcls', function (newVal, oldVal) {
+                if (newVal !== oldVal) {
+                    $scope.$emit('s3:sharingPanelAclUpdated');
+                }
             });
         };
         $scope.syncGrants = function() {
@@ -95,8 +103,8 @@ angular.module('S3SharingPanel', ['EucaConsoleUtils'])
                     'grant_type': 'CanonicalUser'
                 };
                 angular.forEach($scope.grantsArray, function (grant) {
-                    var idPermMatches = grant.id == grantAccountVal && grant.permission == grantPermVal;
-                    var emailPermMatches = grant.email_address == grantAccountVal && grant.permission == grantPermVal;
+                    var idPermMatches = grant.id === grantAccountVal && grant.permission === grantPermVal;
+                    var emailPermMatches = grant.email_address === grantAccountVal && grant.permission === grantPermVal;
                     if (idPermMatches || emailPermMatches) {
                         existingGrantFound = true;
                     }

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2013-2014 Eucalyptus Systems, Inc.
+# Copyright 2013-2015 Hewlett Packard Enterprise Development LP
 #
 # Redistribution and use of this software in source and binary forms,
 # with or without modification, are permitted provided that the following
@@ -25,7 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 """
-Form for Quotas 
+Form for Quotas
 
 """
 import simplejson as json
@@ -46,6 +46,9 @@ class QuotasForm(BaseSecureForm):
     """
     ec2_images_max = wtforms.TextField(label=_(u'Images (maximum)'))
     ec2_instances_max = wtforms.TextField(label=_(u'Instances (maximum)'))
+    ec2_instance_cpu = wtforms.TextField(label=_(u'CPU (cores, maximum)'))
+    ec2_instance_disk = wtforms.TextField(label=_(u'Root disk (GB, maximum)'))
+    ec2_instance_memory = wtforms.TextField(label=_(u'Memory (MB, maximum)'))
     ec2_volumes_max = wtforms.TextField(label=_(u'Volumes (maximum)'))
     ec2_total_size_all_vols = wtforms.TextField(label=_(u'Total size of all volumes (GB)'))
     ec2_snapshots_max = wtforms.TextField(label=_(u'Snapshots (maximum)'))
@@ -73,23 +76,29 @@ class QuotasForm(BaseSecureForm):
             try:
                 policies = conn.get_all_user_policies(user_name=user.user_name)
                 for policy_name in policies.policy_names:
-                    policy_json = conn.get_user_policy(user_name=user.user_name,
-                                        policy_name=policy_name).policy_document
+                    policy_json = conn.get_user_policy(
+                        user_name=user.user_name,
+                        policy_name=policy_name
+                    ).policy_document
                     self.scan_policy(policy_json)
             except BotoServerError as err:
                 pass
         if account is not None:
             try:
                 policies = conn.get_response(
-                            'ListAccountPolicies',
-                            params={'AccountName':account.account_name}, list_marker='PolicyNames')
-                
+                    'ListAccountPolicies',
+                    params={'AccountName': account.account_name},
+                    list_marker='PolicyNames'
+                )
+
                 for policy_name in policies.policy_names:
                     policy_json = conn.get_response(
-                            'GetAccountPolicy',
-                            params={'AccountName':account.account_name, 'PolicyName':policy_name}, verb='POST').policy_document
+                        'GetAccountPolicy',
+                        params={'AccountName': account.account_name, 'PolicyName': policy_name},
+                        verb='POST'
+                    ).policy_document
                     self.scan_policy(policy_json)
-            except BotoServerError as err:
+            except BotoServerError:
                 pass
 
     def scan_policy(self, policy_json):
@@ -100,7 +109,7 @@ class QuotasForm(BaseSecureForm):
             except KeyError:
                 continue
             for cond in s['Condition'].keys():
-                if cond == "NumericLessThanEquals": 
+                if cond == "NumericLessThanEquals":
                     for val in s['Condition'][cond].keys():
                         limit = s['Condition'][cond][val]
                         if val == 'ec2:quota-imagenumber':
@@ -115,6 +124,12 @@ class QuotasForm(BaseSecureForm):
                             self.set_lowest(self.ec2_total_size_all_vols, limit)
                         elif val == 'ec2:quota-addressnumber':
                             self.set_lowest(self.ec2_elastic_ip_max, limit)
+                        elif val == 'ec2:quota-cputotalsize':
+                            self.set_lowest(self.ec2_instance_cpu, limit)
+                        elif val == 'ec2:quota-disktotalsize':
+                            self.set_lowest(self.ec2_instance_disk, limit)
+                        elif val == 'ec2:quota-memorytotalsize':
+                            self.set_lowest(self.ec2_instance_memory, limit)
                         elif val == 's3:quota-bucketnumber':
                             self.set_lowest(self.s3_buckets_max, limit)
                         elif val == 's3:quota-bucketobjectnumber':

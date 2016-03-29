@@ -4,28 +4,36 @@
  *
  */
 
-angular.module('StackPage', ['MagicSearch', 'EucaConsoleUtils'])
-    .controller('StackPageCtrl', function ($scope, $http, $timeout, eucaUnescapeJson) {
+angular.module('StackPage', ['MagicSearch', 'EucaConsoleUtils', 'StackCancelUpdateDialog'])
+    .controller('StackPageCtrl', function ($scope, $http, $timeout, eucaUnescapeJson, eucaHandleError) {
+        $scope.stackName = '';
         $scope.stackStatusEndpoint = '';
         $scope.stackTemplateEndpoint = '';
-        $scope.transitionalStates = ['create-in-progress', 'rollback-in-progress', 'delete-in-progress'];
+        $scope.transitionalStates = ['Create-in-progress', 'Rollback-in-progress', 'Delete-in-progress', 'Create-failed', 'Update-in-progress', 'Update-complete-cleanup-in-progress', 'Update-rollback-in-progress', 'Update-rollback-failed', 'Update-rollback-completed-cleanup-in-progress', 'Update-failed'];
         $scope.stackStatus = '';
         $scope.templateLoading = true;
         $scope.eventsLoading = true;
+        $scope.resources = [];
+        $scope.codeEditor = null;
+        $scope.stackTemplate = '';
+        $scope.currentTab = 'general-tab';
         $scope.initController = function (optionsJson) {
             var options = JSON.parse(eucaUnescapeJson(optionsJson));
-            $scope.stack_name = optionsJson.stack_name;
+            $scope.stackName = options.stack_name;
             $scope.stackStatusEndpoint = options.stack_status_json_url;
             $scope.stackTemplateEndpoint = options.stack_template_url;
+            $scope.stackEventsEndpointOrig = options.stack_events_url;
             $scope.stackEventsEndpoint = options.stack_events_url;
+            $scope.stackStatus = options.stack_status;
             if ($scope.stackStatusEndpoint) {
                 $scope.getStackState();
             }
             if ($scope.stackEventsEndpoint) {
                 $scope.getStackEvents();
             }
-            //$scope.setWatch();
+            $scope.setWatch();
             $scope.setFocus();
+            $scope.initCodeMirror();
         };
         $scope.isTransitional = function () {
             return $scope.transitionalStates.indexOf($scope.stackStatus) !== -1;
@@ -43,6 +51,7 @@ angular.module('StackPage', ['MagicSearch', 'EucaConsoleUtils'])
                     $scope.$broadcast('updatedTab', $scope.currentTab);
                 }
              });
+             $scope.isHelpExpanded = false;
         };
         $scope.clickTab = function ($event, tab){
             $event.preventDefault();
@@ -63,6 +72,12 @@ angular.module('StackPage', ['MagicSearch', 'EucaConsoleUtils'])
                 $(this).find('.dialog-submit-button').css('display', 'none');                
                 $(this).find('.dialog-progress-display').css('display', 'block');                
             });
+        };
+        $scope.showCancelUpdateModal = function () {
+            $("#cancel-update-stack-modal").foundation('reveal', 'open');
+            $timeout(function() {
+                $('.close-reveal-modal').focus();
+            }, 500);
         };
         $scope.setFocus = function () {
             $(document).on('ready', function(){
@@ -100,32 +115,87 @@ angular.module('StackPage', ['MagicSearch', 'EucaConsoleUtils'])
                     if ($scope.isTransitional()) {
                         $scope.isUpdating = true;
                         $timeout(function() {$scope.getStackState();}, 4000);  // Poll every 4 seconds
+                        $scope.getStackEvents();
                     } else {
                         $scope.isUpdating = false;
+                        $scope.updateStatusReasons();
+                        $scope.getStackEvents();
                     }
                 }
             });
         };
         $scope.getStackTemplate = function () {
+        };
+        $scope.initCodeMirror = function () {
+            var templateTextarea = document.getElementById('template-area');
+            $scope.codeEditor = CodeMirror.fromTextArea(templateTextarea, {
+                mode: {name:"javascript", json:true},
+                lineWrapping: true,
+                styleActiveLine: true,
+                lineNumbers: true,
+                readOnly: true
+            });
+        };
+        $scope.clearCodeEditor = function () {
+            $scope.codeEditor.setValue('');
+            $scope.codeEditor.clearHistory();
+        };
+        $scope.viewTemplate = function ($event) {
+            $event.preventDefault();
+            $scope.clearCodeEditor();
+            var viewModal = $('#view-template-modal');
+            viewModal.foundation('reveal', 'open');
+            viewModal.on('close.fndtn.reveal', function() {
+                $scope.clearCodeEditor();
+            });
+            $scope.stackTemplate = ''; // clear any previous policy
             $http.get($scope.stackTemplateEndpoint).success(function(oData) {
                 var results = oData ? oData.results : '';
-                $scope.templateLoading = false;
-                if (results) {
-                    $scope.description = results.description;
-                    $scope.parameters = results.parameters;
-                }
+                $scope.stackTemplate = eucaUnescapeJson(results);
+                $scope.codeEditor.setValue($scope.stackTemplate);
+                $scope.codeEditor.focus();
+            }).error(function (oData, status) {
+                eucaHandleError(oData, status);
             });
         };
         $scope.getStackEvents = function () {
-            $scope.eventsLoading = true;
+            //$scope.eventsLoading = true;
             $http.get($scope.stackEventsEndpoint).success(function(oData) {
                 var results = oData ? oData.results : '';
                 $scope.eventsLoading = false;
                 if (results) {
                     $scope.unfilteredEvents = results.events;
                     $scope.searchEvents();
+                    $('#events-table').stickyTableHeaders();
+                    $scope.updateStatusReasons();
                 }
             });
+        };
+        $scope.updateStatusReasons = function() {
+            if ($scope.unfilteredEvents === undefined) {
+                return;
+            }
+            // look for first stack status and pull status reason
+            $timeout(function() {
+                for (var i=0; i<$scope.unfilteredEvents.length; i++) {
+                    if ($scope.unfilteredEvents[i].type == 'AWS::CloudFormation::Stack') {
+                        $scope.statusReason = $scope.unfilteredEvents[i].status_reason;
+                        break;
+                    }
+                }
+            });
+            // look for status for each resource and pull status reason
+            angular.forEach($scope.resources, function(value, key) {
+                for (var i=0; i<$scope.unfilteredEvents.length; i++) {
+                    if (value.physical_id == $scope.unfilteredEvents[i].physical_id) {
+                        value.status_reason = $scope.unfilteredEvents[i].status_reason;
+                        break;
+                    }
+                }
+            });
+        };
+        $scope.displayStatus = function(stackStatus) {
+            return stackStatus.replace(/-/g, ' ');
         };
         $scope.searchEvents = function() {
             var filterText = ($scope.searchFilter || '').toLowerCase();
@@ -156,7 +226,7 @@ angular.module('StackPage', ['MagicSearch', 'EucaConsoleUtils'])
             $scope.events = filteredItems;
         };
         $scope.$on('searchUpdated', function($event, query) {
-            $scope.jsonEndpoint = decodeURIComponent($scope.jsonEndpointPrefix + "&" + query);
+            $scope.stackEventsEndpoint = decodeURIComponent($scope.stackEventsEndpointOrig + "?" + query);
             $scope.getStackEvents();
         });
         $scope.$on('textSearch', function($event, text, filter_keys) {

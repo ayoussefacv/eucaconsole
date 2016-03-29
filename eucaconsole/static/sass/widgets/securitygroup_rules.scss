@@ -11,8 +11,8 @@ form {
     .row.trafficfrom {
         margin-top: 1rem;
     }
-    .ip-label, .sg-label {
-        margin-right: 1rem;
+    .ip-label {
+        margin-right: 26px;
     }
     .ipaddress, .securitygroupname {
         text-align: left !important;
@@ -40,6 +40,7 @@ form {
     @include item-list;
     .add-label {
         margin-bottom: 6px;
+        color: $hp-gray-65;
     }
     .tabs-content {
         margin-top: 0.5rem;
@@ -49,6 +50,10 @@ form {
 .duplicated-rule-error{
     color: red;
     padding: 10px 10px;
+}
+
+.add-button {
+    padding-top: 2rem;
 }
 
 div {

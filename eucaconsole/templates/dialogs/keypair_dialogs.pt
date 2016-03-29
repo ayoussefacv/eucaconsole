@@ -4,7 +4,10 @@
          tal:define="landingpage_action request.route_path('keypair_delete');
                      detailpage_action request.route_path('keypair_delete', id=keypair.name) if keypair else '';
                      action landingpage_action if landingpage else detailpage_action;">
-        <h3 i18n:translate="">Delete key</h3>
+        <h3>
+            <span i18n:translate="" ng-if="!multipleItemsSelected">Delete key</span>
+            <span i18n:translate="" ng-if="multipleItemsSelected">Delete keys</span>
+        </h3>
         <p>
             <span i18n:translate="">Are you sure you want to delete key</span>
             <span tal:condition="keypair"><b class="breakword">${keypair_name}</b>?</span>
@@ -22,7 +25,7 @@
                 <button type="submit" id="delete_keypair_submit_button" class="button expand" i18n:translate="">Yes, Delete</button>
             </div>
             <div class="dialog-progress-display hide">
-                <span i18n:translate="">Sending request </span>&nbsp;<em><span class="busy">&nbsp;</span></em>
+                <span i18n:translate="">Sending request </span>&nbsp;<i class="busy"></i>
             </div>
         </form>
         <a href="#" id="delete_keypair_close_link" class="close-reveal-modal">&#215;</a>

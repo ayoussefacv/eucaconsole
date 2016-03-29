@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2013-2014 Eucalyptus Systems, Inc.
+# Copyright 2013-2015 Hewlett Packard Enterprise Development LP
 #
 # Redistribution and use of this software in source and binary forms,
 # with or without modification, are permitted provided that the following
@@ -25,14 +25,14 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 """
-Forms for Key Pairs 
+Forms for Key Pairs
 
 """
 import wtforms
 from wtforms import validators
 
 from ..i18n import _
-from . import BaseSecureForm, ASCII_WITHOUT_SLASHES_NOTICE
+from . import BaseSecureForm
 
 
 class KeyPairForm(BaseSecureForm):

@@ -1,0 +1,36 @@
+/* @fileOverview Instance Selector CSS */
+
+// Import common Foundation variables
+@import "../includes/eucavariables";
+
+
+// Status colors
+$instance-status-color-running: $hpe-slate;
+$instance-status-color-pending: lighten($hpe-slate, 20%);
+$instance-status-color-stopped: darkred;
+$instance-status-color-stopping: lighten(red, 20%);
+$instance-status-color-terminated: $hpe-gray;
+$instance-status-color-terminating: $hpe-lightgray;
+
+
+
+// Tile/table view
+.status.running { background-color: $instance-status-color-running; }
+.status.pending { background-color: $instance-status-color-pending; }
+.status.stopped, .status.Error { background-color: $instance-status-color-stopped; }
+.status.stopping { background-color: $instance-status-color-stopping; }
+.status.terminated { background-color: $instance-status-color-terminated; }
+.status.shutting-down { background-color: $instance-status-color-terminating; }
+
+// ELB instance status
+.status.InService {background-color: $instance-status-color-running; }
+.status.OutOfService { background-color: $instance-status-color-stopped; }
+
+#instance-selector {
+    table.table {
+        width: 100%;
+    }
+}
+
+// Other styles
+.fi-alert { color: darkred; }

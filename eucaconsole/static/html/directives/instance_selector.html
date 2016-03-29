@@ -1,0 +1,57 @@
+<div id="instance-selector" ng-cloak="">
+    <table class="table">
+        <thead>
+            <tr>
+                <th><input type="checkbox" id="instance-all-checkbox" value="_all" /></th>
+                <th>{{ tableText.name }}</th>
+                <th>{{ tableText.tags }}</th>
+                <th>{{ tableText.zone }}</th>
+                <th ng-if="isVPCSupported">{{ tableText.subnet }}</th>
+                <th>{{ tableText.status }}</th>
+                <th class="status-descr">{{ tableText.status_descr }}</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr ng-repeat="instance in instanceList track by instance.id">
+                <td>
+                    <input type="checkbox" name="instances" id="instance-checkbox-{{ instance.id }}" value="{{ instance.id }}" />
+                </td>
+                <td>
+                    <span id="instance-name-{{ instance.id }}" class="id breakword">
+                        <a ng-href="/instances/{{ instance.id }}" target="_blank">{{ instance.name }}</a>
+                    </span>
+                </td>
+                <td class="breakall">{{ instance.tags }}</td>
+                <td>
+                    <i ng-show="!isVPCSupported &amp;&amp; selectedZones.indexOf(instance.availability_zone) === -1"
+                       class="fi-alert" data-tooltip="" i18n:attributes="title"
+                       title="Instances will not receive any traffic until you enable this zone"></i>
+                    {{ instance.availability_zone }}
+                </td>
+                <td ng-if="isVPCSupported">
+                    <i ng-show="selectedSubnets.indexOf(instance.subnet_id) === -1"
+                       class="fi-alert" data-tooltip="" i18n:attributes="title"
+                       title="Instances will not receive any traffic until you enable this subnet"></i>
+                    <span ng-show="instance.vpc_name != ''">
+                        {{ instance.vpc_subnet_display }} | {{ instance.vpc_name }}
+                    </span>
+                </td>
+                <td class="status">
+                    <span class="label radius status {{ instanceHealthMapping[instance.id].state || instance.status }}">
+                        {{ healthStatusNames[instanceHealthMapping[instance.id].state] || instance.status }}
+                    </span>
+                </td>
+                <td>
+                    {{ instanceHealthMapping[instance.id].description }}
+                </td>
+            </tr>
+            <tr ng-show="instanceList.length === 0">
+                <td></td>
+                <td colspan="5">
+                    <span ng-show="instancesLoading" class="busy"></span>
+                    <span ng-show="!instancesLoading">{{ tableText.no_matching_instance_error_msg }}</span>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>

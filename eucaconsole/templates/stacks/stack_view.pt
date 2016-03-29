@@ -1,6 +1,7 @@
 <metal:block use-macro="main_template" i18n:domain="eucaconsole">
 
 <head metal:fill-slot="head_css">
+    <link rel="stylesheet" href="${request.static_path('eucaconsole:static/js/thirdparty/codemirror/codemirror.css')}" />
     <link rel="stylesheet" type="text/css" href="${request.static_path('eucaconsole:static/css/pages/stacks.css')}" />
     <link rel="stylesheet" type="text/css" href="${request.static_path('eucaconsole:static/css/pages/stack.css')}" />
     <link rel="stylesheet" type="text/css" href="${request.static_path('eucaconsole:static/js/thirdparty/magic-search/magic_search.css')}"/>
@@ -21,7 +22,7 @@
             <strong i18n:translate="">Details for stack:</strong>
             <em>${stack_name}</em>
         </h3>
-        <div class="large-9 columns">
+        <div class="large-12 columns">
             <dl class="tabs">
                 <dd class="active"><a href="#general-tab" ng-click="clickTab($event, 'general-tab')" i18n:translate="">General</a></dd>
                 <dd><a href="#template-tab" ng-click="clickTab($event, 'template-tab')" i18n:translate="">Template</a></dd>
@@ -32,6 +33,14 @@
                     <metal:block metal:use-macro="layout.global_macros['actions_menu']" tal:condition="stack">
                         <metal:actions metal:fill-slot="actions">
                             <li ng-show="stackStatus !== 'delete-complete' &amp;&amp; !isTransitional()">
+                                <a id="update-stack-action" href="${request.route_path('stack_update', name=stack_name)}"
+                                   i18n:translate="">Update stack</a>
+                            </li>
+                            <li ng-show="stackStatus === 'Update-in-progress'">
+                                <a id="cancel-update-stack-action" ng-click="showCancelUpdateModal()"
+                                   i18n:translate="">Cancel update</a>
+                            </li>
+                            <li ng-show="stackStatus !== 'delete-complete' &amp;&amp; !isTransitional()">
                                 <a id="delete-stack-action" data-reveal-id="delete-stack-modal"
                                    i18n:translate="">Delete stack</a>
                             </li>
@@ -39,27 +48,32 @@
                     </metal:block>
                     <div class="columns section">
                         <h6 i18n:translate="">Stack</h6>
-                        <div class="row readonly">
-                            <div class="small-2 columns"><label i18n:translate="">Name</label></div>
+                        <div class="row controls-wrapper readonly">
+                            <div class="small-2 columns"><label i18n:translate="" class="right">Name</label></div>
                             <div class="small-10 columns value">${stack_name}</div>
                         </div>
-                        <div class="row readonly">
-                            <div class="small-2 columns"><label i18n:translate="">ID</label></div>
+                        <div class="row controls-wrapper readonly">
+                            <div class="small-2 columns"><label i18n:translate="" class="right">ID</label></div>
                             <div class="small-10 columns value">${stack.stack_id}</div>
                         </div>
-                        <div class="row readonly">
-                            <div class="small-2 columns"><label i18n:translate="">Creation time</label></div>
+                        <div class="row controls-wrapper readonly">
+                            <div class="small-2 columns"><label i18n:translate="" class="right">Creation time</label></div>
                             <div class="small-10 columns value" ng-cloak="">
                                 {{ '${stack_creation_time}' | date: '${layout.angular_date_format}' }}
                             </div>
                         </div>
-                        <div class="row readonly">
-                            <div class="small-2 columns"><label i18n:translate="">Status</label></div>
+                        <div class="row controls-wrapper readonly">
+                            <div class="small-2 columns"><label i18n:translate="" class="right">Status</label></div>
                             <div class="small-10 columns value" ng-cloak="">
-                                <span class="label radius status ${status}">{{ stackStatus.replace('-', ' ').replace('-', ' ') }}</span>
-                                <span class="busy" ng-show="isTransitional()">&nbsp;</span>
+                                <span class="label radius status {{stackStatus}}">{{ displayStatus(stackStatus) }}</span>
+                                <span class="busy" ng-show="isTransitional()"></span>
                             </div>
                         </div>
+                        <div class="row controls-wrapper readonly" ng-show="statusReason">
+                            <div class="small-2 columns"><label i18n:translate="" class="right">Status Reason</label></div>
+                            <div class="small-10 columns value">{{ statusReason }}</div>
+                        </div>
+                        <br/>
                     </div>
                     <hr/>
                     <div class="columns section">
@@ -69,7 +83,7 @@
                                 <!-- Begin table view -->
                                 <table class="table">
                                     <thead><tr>
-                                        <th i18n:translate="">NAME</th>
+                                        <th i18n:translate="">KEY</th>
                                         <th i18n:translate="">VALUE</th>
                                     </tr></thead>
                                     <tbody>
@@ -92,11 +106,13 @@
                                 <table class="table" ng-show="!itemsLoading" ng-cloak="true">
                                     <thead><tr>
                                         <th i18n:translate="">KEY</th>
+                                        <th i18n:translate="">DESCRIPTION</th>
                                         <th i18n:translate="">VALUE</th>
                                     </tr></thead>
                                     <tbody>
-                                        <tr ng-repeat="item in outputs | orderBy: sortBy:sortReverse" ng-cloak="true">
+                                        <tr ng-repeat="item in outputs | orderBy: sortBy" ng-cloak="true">
                                             <td>{{ item.key }}</td>
+                                            <td>{{ item.description }}</td>
                                             <td>{{ item.value }}</td>
                                         </tr>
                                         <tr ng-show="!itemsLoading"></tr>
@@ -104,6 +120,7 @@
                                 </table>
                             </div>
                         </div>
+                        <br/>
                     </div>
                     <hr/>
                     <div class="columns section">
@@ -117,19 +134,21 @@
                                         <th i18n:translate="">TYPE (LOGICAL ID)</th>
                                         <th i18n:translate="">PHYSICAL ID</th>
                                         <th i18n:translate="">STATUS</th>
-                                        <th i18n:translate="">TIME UPDATED</th>
+                                        <th i18n:translate="">STATUS REASON</th>
                                     </tr></thead>
                                     <tbody>
-                                        <tr ng-repeat="item in resources | orderBy: sortBy:sortReverse" ng-cloak="true">
+                                        <tr ng-repeat="item in resources | orderBy: sortBy" ng-cloak="true">
                                             <td>{{ item.type }} ({{ item.logical_id }})</td>
-                                            <td ng-hide="item.url">
+                                            <td ng-hide="item.url" class="breakall">
                                                 {{ item.physical_id }}
                                             </td>
-                                            <td ng-show="item.url">
-                                                <a href="{{ item.url }}">{{ item.physical_id }}<a>
+                                            <td ng-show="item.url" class="breakall">
+                                                <a ng-href="{{ item.url }}">{{ item.physical_id }}</a>
                                             </td>
-                                            <td><span class="label radius status {{ item.status }}">{{ item.status.replace('-', ' ').replace('-', ' ') }}</span></td>
-                                            <td>{{ item.updated_timestamp | date:'${layout.angular_date_format}' }}</td>
+                                            <td><span class="label radius status {{ item.status }}">{{ displayStatus(item.status) }}</span></td>
+                                            <td>
+                                                {{ item.status_reason }}
+                                            </td>
                                         </tr>
                                         <tr ng-show="!itemsLoading"></tr>
                                     </tbody>
@@ -144,40 +163,43 @@
                             <span i18n:translate="">Actions</span>
                         </span>
                         <ul id="actions-dropdown2" class="f-dropdown" data-dropdown-content="">
+                            <li ng-show="stackStatus !== 'delete-complete' &amp;&amp; !isTransitional()">
+                                <a id="update-stack-action-2" href="${request.route_path('stack_update', name=stack_name)}"
+                                   i18n:translate="">Update stack</a>
+                            </li>
+                            <li ng-show="stackStatus === 'update-in-progress'">
+                                <a id="cancel-update-stack-action-2" ng-click="showCancelUpdateModal()"
+                                   i18n:translate="">Cancel update</a>
+                            </li>
                             <li>
-                                <a id="delete-user-action" i18n:translate="">
-                                    Delete stack
-                                </a>
+                                <a id="delete-stack-action-2" data-reveal-id="delete-stack-modal"
+                                   i18n:translate="">Delete stack</a>
                             </li>
                         </ul>
                     </div>
                     <div class="columns section">
+                        &nbsp;
                         <h6 i18n:translate="">Template</h6>
-                        <div class="row readonly">
-                            <div class="small-2 columns"><label i18n:translate="">Description</label></div>
-                            <div class="small-10 columns value">${stack_description}</div>
+                        <div class="row controls-wrapper readonly" tal:condition="template_name">
+                            <div class="small-2 columns"><label i18n:translate="" class="right">Name</label></div>
+                            <div class="small-10 columns value">
+                                <a href="${request.route_path('bucket_item_details', name=template_bucket, subpath=template_key)}">${template_name}</a>
+                            </div>
                         </div>
+                        <div class="row controls-wrapper readonly">
+                            <div class="small-2 columns"><label i18n:translate="" class="right">Description</label></div>
+                            <div class="small-10 columns value">${stack_description}&nbsp;
+                                <a ng-click="viewTemplate($event)" i18n:translate="">View template</a>
+                            </div>
+                        </div>
+                        <span>&nbsp;</span>
                     </div>
                     <hr/>
                     <div class="columns section">
                         <h6 i18n:translate="">Parameters</h6>
-                        <div class="datagrid" id="datagrid-items">
-                            <div id="tableview" class="gridwrapper">
-                                <!-- Begin table view -->
-                                <table class="table">
-                                    <thead><tr>
-                                        <th i18n:translate="">NAME</th>
-                                        <th i18n:translate="">DESCRIPTION</th>
-                                    </tr></thead>
-                                    <tbody>
-                                        <tr tal:repeat="item stack.parameters" ng-cloak="true">
-                                            <td>${item.key}</td>
-                                            <td>${item.value}</td>
-                                        </tr>
-                                        <tr></tr>
-                                    </tbody>
-                                </table>
-                            </div>
+                        <div class="row controls-wrapper readonly" tal:repeat="item stack.parameters" ng-cloak="true">
+                            <div class="small-2 columns"><label class="right" ng-non-bindable="">${item.key}</label></div>
+                            <div class="small-10 columns value" ng-non-bindable="">${item.value}</div>
                         </div>
                     </div>
                 </div>
@@ -187,41 +209,53 @@
                             <span i18n:translate="">Actions</span>
                         </span>
                         <ul id="actions-dropdown3" class="f-dropdown" data-dropdown-content="">
+                            <li ng-show="stackStatus !== 'delete-complete' &amp;&amp; !isTransitional()">
+                                <a id="update-stack-action-3" href="${request.route_path('stack_update', name=stack_name)}"
+                                   i18n:translate="">Update stack</a>
+                            </li>
+                            <li ng-show="stackStatus === 'update-in-progress'">
+                                <a id="cancel-update-stack-action-3" ng-click="showCancelUpdateModal()"
+                                   i18n:translate="">Cancel update</a>
+                            </li>
                             <li>
-                                <a id="delete-user-action" i18n:translate="">
-                                    Delete stack
-                                </a>
+                                <a id="delete-stack-action-3" data-reveal-id="delete-stack-modal"
+                                   i18n:translate="">Delete stack</a>
                             </li>
                         </ul>
                     </div>
                     <div class="columns section">
+                        &nbsp;
                         <h6 i18n:translate="">Events</h6>
-                        <div ng-app="MagicSearch">
+                        <div>
                             <magic-search template="${request.static_path('eucaconsole:static/js/thirdparty/magic-search/magic_search.html')}"
-                                strings="{'remove':'Remove facet', 'cancel':'Clear search', 'prompt':'Select facets for filter, or enter text to search'}"
+                                strings="{'remove':'${layout.searchtext_remove}', 'cancel':'${layout.searchtext_cancel}', 'prompt':'${layout.searchtext_prompt}', 'text':'${layout.searchtext_text_facet}'}"
                                 facets="${search_facets}" filter-keys="${filter_keys}"></magic-search>
                         </div>
                         <div class="datagrid" id="datagrid-items">
                             <div ng-show="eventsLoading"><span class="busy"></span></div>
                             <div id="tableview" class="gridwrapper" ng-show="!eventsLoading">
                                 <!-- Begin table view -->
-                                <table class="table" ng-show="!eventsLoading" ng-cloak="true">
+                                <table id="events-table" class="table" ng-show="!eventsLoading" ng-cloak="true">
                                     <thead class="header"><tr>
                                         <th i18n:translate="">TIMESTAMP</th>
                                         <th i18n:translate="">STATUS</th>
+                                        <th i18n:translate="">STATUS REASON</th>
                                         <th i18n:translate="">TYPE (LOGICAL ID)</th>
                                         <th i18n:translate="">PHYSICAL ID</th>
                                     </tr></thead>
                                     <tbody>
-                                        <tr ng-repeat="item in events | orderBy: sortBy:sortReverse" ng-cloak="true">
+                                        <tr ng-repeat="item in events | orderBy: sortBy" ng-cloak="true">
                                             <td>{{ item.timestamp | date:'${layout.angular_date_format}' }}</td>
-                                            <td><span class="label radius status {{ item.status }}">{{ item.status.replace('-', ' ').replace('-', ' ') }}</span></td>
+                                            <td><span class="label radius status {{ item.status }}">{{ displayStatus(item.status) }}</span></td>
+                                            <td>
+                                                {{ item.status_reason }}
+                                            </td>
                                             <td>{{ item.type }} ({{ item.logical_id }})</td>
-                                            <td ng-hide="item.url">
+                                            <td ng-hide="item.url" class="breakall">
                                                 {{ item.physical_id }}
                                             </td>
-                                            <td ng-show="item.url">
-                                                <a href="{{ item.url }}">{{ item.physical_id }}<a>
+                                            <td ng-show="item.url" class="breakall">
+                                                <a ng-href="{{ item.url }}">{{ item.physical_id }}</a>
                                             </td>
                                         </tr>
                                         <tr ng-show="!eventsLoading"></tr>
@@ -233,24 +267,41 @@
                 </div>
             </div>
         </div>
-        <div class="large-3 columns">
+        <div class="large-12 columns">
             <metal:block metal:use-macro="layout.global_macros['help_expando']" />
             <div class="help-content" ng-show="isHelpExpanded" ng-cloak="">
                 <!--! Help goes here -->
-                <!--
-                <div id="help-html-console_edit_launch_config"
-                    ng-include="'${layout.help_path('console_stack_view.html')}'">
+                <div id="help-html-console_stack_detail_general" ng-show="currentTab == 'general-tab'"
+                    ng-include="'${layout.help_path('console_stack_detail_general.html')}'">
                 </div> 
-                -->
+                <div id="help-html-console_stack_detail_template" ng-show="currentTab == 'template-tab'"
+                    ng-include="'${layout.help_path('console_stack_detail_template.html')}'">
+                </div> 
+                <div id="help-html-console_stack_detail_events" ng-show="currentTab == 'events-tab'"
+                    ng-include="'${layout.help_path('console_stack_detail_events.html')}'">
+                </div> 
             </div>
         </div>
         <!--! Modal dialogs -->
         ${panel('stack_dialogs', stack=stack, delete_form=delete_form)}
+        <stack-cancel-update-dialog template="${request.route_path('render_template', subpath='stacks/stack_cancel_update_dialog')}" stack-name="stackName">
+        </stack-cancel-update-dialog>
+    </div>
+    <div id="view-template-modal" class="reveal-modal large" data-reveal="">
+        <h3>${stack_name} <span i18n:translate="">template</span></h3>
+        <textarea id="template-area" class="template-area" ng-model="stackTemplate"></textarea>
+        <a class="close-reveal-modal">&#215;</a>
     </div>
 </div>
 
 <div metal:fill-slot="tail_js">
     <script src="${request.static_path('eucaconsole:static/js/thirdparty/magic-search/magic_search.js')}"></script>
+    <script src="${request.static_path('eucaconsole:static/js/thirdparty/jquery/jquery.stickytableheaders.min.js')}"></script>
+    <script src="${request.static_path('eucaconsole:static/js/thirdparty/codemirror/codemirror.js')}"></script>
+    <script src="${request.static_path('eucaconsole:static/js/thirdparty/codemirror/javascript.js')}"></script>
+    <script src="${request.static_path('eucaconsole:static/js/thirdparty/codemirror/active-line.js')}"></script>
+    <script src="${request.static_path('eucaconsole:static/js/pages/eucaroutes.js')}"></script>
+    <script src="${request.static_path('eucaconsole:static/js/pages/stack_cancel_update_dialog.js')}"></script>
     <script src="${request.static_path('eucaconsole:static/js/pages/stack.js')}"></script>
 </div>
 

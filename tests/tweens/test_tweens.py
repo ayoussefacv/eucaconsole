@@ -1,4 +1,4 @@
-# Copyright 2013-2014 Eucalyptus Systems, Inc.
+# Copyright 2013-2015 Hewlett Packard Enterprise Development LP
 #
 # Redistribution and use of this software in source and binary forms,
 # with or without modification, are permitted provided that the following
@@ -60,7 +60,8 @@ class TestSetup(unittest.TestCase):
 
         config = MockConfig()
         self.assertTrue(len(config.tweens) == 0)
-        setup_tweens(config)
+        settings = {'log.useractions': 'true'}
+        setup_tweens(config, settings)
         self.assertTrue(len(config.tweens) > 1)
 
 
@@ -94,8 +95,8 @@ class TestCTHeaders(unittest.TestCase):
         headers = CTFactory.header_map['text/html']
         self.assertTrue('CONTENT-SECURITY-POLICY' in headers.keys())
         self.assertTrue('X-CONTENT-SECURITY-POLICY' in headers.keys())  # IE requires header prefix
-        self.assertEquals(headers.get('CONTENT-SECURITY-POLICY'), "script-src 'self'")
-        self.assertEquals(headers.get('X-CONTENT-SECURITY-POLICY'), "script-src 'self'")
+        self.assertEquals(headers.get('CONTENT-SECURITY-POLICY'), "script-src 'self'; form-action 'self';")
+        self.assertEquals(headers.get('X-CONTENT-SECURITY-POLICY'), "script-src 'self'; form-action 'self';")
 
 
 class TestHTTPSTween(unittest.TestCase):

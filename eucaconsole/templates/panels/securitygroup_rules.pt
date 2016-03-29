@@ -1,6 +1,6 @@
 
 <!--! Security group rules editor -->
-<div id="rules-editor" class="row controls-wrapper" ng-app="SecurityGroupRules" i18n:domain="eucaconsole"
+<div id="rules-editor" class="row controls-wrapper" i18n:domain="eucaconsole"
      ng-controller="SecurityGroupRulesCtrl" ng-init="initRules('${controller_options_json}')">
     <link rel="stylesheet" href="${request.static_path('eucaconsole:static/css/widgets/securitygroup_rules.css')}"
           type="text/css" charset="utf-8" />
@@ -8,16 +8,14 @@
         <h6 i18n:translate="">Rules</h6>
     </div>
     <div class="columns">
-        <dl class="tabs" data-tab="">
-            <dd ng-class="inboundButtonClass">
-                <a id="inbound-rules-tab" ng-click="selectRuleType('inbound')" i18n:translate="">Inbound</a>
-            </dd>
-            <dd ng-class="outboundButtonClass" ng-show="securityGroupVPC != '' &amp;&amp; securityGroupVPC != 'None'">
-                <a id="outbound-rules-tab" ng-click="selectRuleType('outbound')" i18n:translate="">Outbound</a>
-            </dd>
+        <dl class="tabs" ng-show="securityGroupVPC != '' &amp;&amp; securityGroupVPC != 'None'" ng-cloak="">
+            <dd ng-class="inboundButtonClass"><a id="inbound-rules-tab"
+               ng-click="selectRuleType('inbound')" i18n:translate="">Inbound</a></dd>
+            <dd ng-class="outboundButtonClass"><a id="outbound-rules-tab"
+               ng-click="selectRuleType('outbound')" i18n:translate="">Outbound</a></dd>
         </dl>
         <div class="tabs-content">
-            <div class="columns field" ng-cloak="cloak">
+            <div class="columns field" ng-cloak="">
                 <div class="item-list">
                     <span class="label radius secondary item" ng-repeat="rule in rulesArray" ng-show="ruleType=='inbound'">
                         <span ng-show="!rule.custom_protocol">
@@ -87,7 +85,7 @@
                             </div>
                         </div>
                     </div>
-                    <div class="row" ng-show="selectedProtocol &amp;&amp; selectedProtocol !== 'custom'">
+                    <div class="row" ng-show="selectedProtocol &amp;&amp; ['custom', 'sctp'].indexOf(selectedProtocol) === -1">
                         <div class="small-3 columns">
                             <label class="right" ng-show="selectedProtocol !== 'icmp' &amp;&amp; selectedProtocol !== '-1'" i18n:translate="">Port range</label>
                             <label class="right" ng-show="selectedProtocol == 'icmp'" i18n:translate="">Type</label>
@@ -112,8 +110,8 @@
                         <div class="small-9 columns">
                             <div class="ipaddress">
                                 <div class="cidr-block">
-                                    <input type="radio" name="traffictype" value="ip" checked="checked" ng-model="trafficType"/>
-                                    <label><span i18n:translate="" class="ip-label">IP address</span></label>
+                                    <input id="traffictype-ip" type="radio" name="traffictype" value="ip" checked="checked" ng-model="trafficType"/>
+                                    <label for="traffictype-ip"><span i18n:translate="" class="ip-label">IP address</span></label>
                                 </div>
                                 <div class="cidr-block">
                                     <div> 
@@ -133,12 +131,12 @@
                                 </div>
                             </div>
                             <div class="securitygroupname">
-                                <input type="radio" name="traffictype" value="securitygroup" ng-model="trafficType" />
-                                <label><span i18n:translate="" class="sg-label">Security group</span></label>
+                                <input id="traffictype-group" type="radio" name="traffictype" value="securitygroup" ng-model="trafficType" />
+                                <label for="traffictype-group"><span i18n:translate="" class="sg-label">Security group</span></label>
                                 <select id="groupname-select" name="groupname" class="groupname" ng-model="groupName"
                                     ng-required="selectedProtocol &amp;&amp; trafficType=='securitygroup'" data-placeholder="select...">
                                     <option ng-repeat="securityGroup in securityGroupList" 
-                                         value="{{ securityGroup.name }}">{{ securityGroup.name }} ({{ securityGroup.id }})</option>
+                                         value="{{ securityGroup.id ? '' : securityGroup.owner_id + '/' }}{{ securityGroup.name }}">{{ securityGroup.id ? '' : securityGroup.owner_id + '/' }}{{ securityGroup.name }}{{ securityGroup.id ? ' (' + securityGroup.id + ')' : '' }}</option>
                                 </select>
                                 <div><small class="error" i18n:translate="">Security group is required</small></div>
                                 <div><small class="error-msg" ng-show="hasDuplicatedRule" i18n:translate="">Rule already exists</small></div>
@@ -149,10 +147,10 @@
                         </div>
                     </div>
                 </div>
-                <div class="row" id="add-rule-button-div" ng-show="selectedProtocol">
+                <div class="row add-button" id="add-rule-button-div" ng-show="selectedProtocol">
                     <div class="small-3 columns">&nbsp;</div>
                     <div class="small-9 columns">
-                        <a href="#" id="button-add-rule" class="button round small" i18n:translate="" ng-class="addRuleButtonClass"
+                        <a href="#" id="button-add-rule" class="button round tiny" i18n:translate="" ng-class="addRuleButtonClass"
                             ng-click="addRule($event)" ng-disabled="isRuleNotComplete">Add Rule</a>
                         <a href="#" id="button-cancel-rule" class="cancel-link" i18n:translate="" 
                             ng-click="cancelRule($event)">Cancel</a>
@@ -175,8 +173,8 @@
     </div>
     <div id="hidden-text-div" class="hide">
         <span id="all-traffic-option-text" i18n:translate="">All traffic</span> 
+        <span id="sctp-protocol-option-text" i18n:translate="">SCTP</span> 
         <span id="custom-protocol-option-text" i18n:translate="">Custom protocol</span> 
     </div>
-    <script src="${request.static_path('eucaconsole:static/js/pages/custom_filters.js')}"></script>
     <script src="${request.static_path('eucaconsole:static/js/widgets/securitygroup_rules.js')}"></script>
 </div>

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2013-2014 Eucalyptus Systems, Inc.
+# Copyright 2013-2015 Hewlett Packard Enterprise Development LP
 #
 # Redistribution and use of this software in source and binary forms,
 # with or without modification, are permitted provided that the following
@@ -49,6 +49,7 @@ class RolesView(LandingPageView):
 
     def __init__(self, request):
         super(RolesView, self).__init__(request)
+        self.title_parts = [_(u'Roles')]
         self.conn = self.get_connection(conn_type="iam")
         self.initial_sort_key = 'role_name'
         self.prefix = '/roles'
@@ -68,7 +69,6 @@ class RolesView(LandingPageView):
         ]
 
         return dict(
-            filter_fields=False,
             filter_keys=self.filter_keys,
             search_facets=BaseView.escape_json(json.dumps([])),
             sort_keys=self.sort_keys,
@@ -118,15 +118,15 @@ class RolesJsonView(BaseView):
                 try:
                     policies = self.conn.list_role_policies(role_name=role.role_name)
                     policies = policies.policy_names
-                except BotoServerError as exc:
+                except BotoServerError:
                     pass
                 instances = []
                 try:
                     profile_arns = [profile.arn for profile in profiles if
-                                    profile.roles.member.role_name == role.role_name]
+                                    profile.roles and profile.roles.member.role_name == role.role_name]
                     instances = self.get_connection().get_only_instances(
                         filters={'iam-instance-profile.arn': profile_arns})
-                except BotoServerError as exc:
+                except BotoServerError:
                     pass
                 """
                 user_count = 0
@@ -156,6 +156,7 @@ class RoleView(BaseView):
 
     def __init__(self, request):
         super(RoleView, self).__init__(request)
+        self.title_parts = [_(u'Role'), request.matchdict.get('name') or _(u'Create')]
         self.conn = self.get_connection(conn_type="iam")
         self.role = self.get_role()
         self.role_route_id = self.request.matchdict.get('name')
@@ -186,7 +187,7 @@ class RoleView(BaseView):
         try:
             role = self.conn.get_role(role_name=role_param)
             role = role.get_role_response.get_role_result.role
-        except BotoServerError as err:
+        except BotoServerError:
             pass
         return role
 
@@ -231,7 +232,7 @@ class RoleView(BaseView):
                 profiles = self.conn.list_instance_profiles()
                 profiles = profiles.list_instance_profiles_response.list_instance_profiles_result.instance_profiles
                 profile_arns = [profile.arn for profile in profiles if
-                                profile.roles.member.role_name == self.role.role_name]
+                                profile.roles and profile.roles.member.role_name == self.role.role_name]
                 instances = self.get_connection().get_only_instances(filters={'iam-instance-profile.arn': profile_arns})
                 for instance in instances:
                     instance.name = TaggedItemView.get_display_name(instance)

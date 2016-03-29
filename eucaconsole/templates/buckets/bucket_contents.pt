@@ -1,12 +1,13 @@
 <metal:block use-macro="main_template" i18n:domain="eucaconsole">
 
 <head metal:fill-slot="head_css">
+    <meta http-equiv="refresh" content="300" /><!--! Reload page to refresh generated download URLs every 5 min -->
     <link rel="stylesheet" type="text/css" href="${request.static_path('eucaconsole:static/css/pages/bucket_contents.css')}" />
 </head>
 
 <div metal:fill-slot="main_content" ng-app="BucketContentsPage" ng-controller="BucketContentsCtrl"
         ng-init="initController('${controller_options_json}')">
-    <div class="row" id="contentwrap" ng-app="LandingPage" ng-controller="ItemsCtrl"
+    <div class="row" id="contentwrap" ng-controller="ItemsCtrl"
          ng-init="initController('bucketcontents', '${initial_sort_key}', '${json_items_endpoint}')">
         <metal:breadcrumbs metal:use-macro="layout.global_macros['breadcrumbs']">
             <metal:crumbs metal:fill-slot="crumbs">
@@ -31,26 +32,31 @@
            tal:condition="len(request.subpath) == 0" i18n:translate="">View details</a>
         <div metal:use-macro="layout.global_macros['landing_page_datagrid']">
             <div metal:fill-slot="new_button">
-                <a class="button" id="upload-file-btn" i18n:translate="" tal:condition="layout.file_uploads_enabled"
-                   href="${request.route_path('bucket_upload', name=bucket_name, subpath=request.subpath)}">
-                    Upload File(s)
+                <a id="upload-file-btn" class="button split" tal:condition="layout.file_uploads_enabled"
+                    href="${request.route_path('bucket_upload', name=bucket_name, subpath=request.subpath)}">
+                    <span i18n:translate="" tal:omit-tag="">Upload Object(s)</span>
+                    <span class="euca-split" data-dropdown="create-drop"></span>
                 </a>
-                <span tal:condition="layout.file_uploads_enabled">&nbsp;&nbsp;</span>
-                <a class="button" id="create-folder-btn" i18n:translate="" data-reveal-id="create-folder-modal">
-                    Create New Folder
+                <ul id="create-drop" class="f-dropdown" data-dropdown-content="">
+                    <li>
+                        <a id="create-folder-btn" i18n:translate="" data-reveal-id="create-folder-modal">
+                            Create Folder
+                        </a>
+                    </li>
+                </ul>
+                <a class="button" id="create-folder-btn" i18n:translate="" data-reveal-id="create-folder-modal" tal:condition="not layout.file_uploads_enabled">
+                    Create Folder
                 </a>
                 &nbsp;&nbsp;
                 <a class="button secondary ng-binding" id="delete-all-btn" i18n:translate="" ng-click="revealModal('delete-all')">
                     Delete All Objects/Folders
                 </a>
                 &nbsp;&nbsp;
-                <a class="button secondary ng-binding" id="paste-btn" i18n:translate="" ng-cloak=""
-                    ng-show="hasCopyItem" ng-click="doPaste('${bucket_name}', null, '${key_prefix}')">
-                    Paste Object
-                </a>
-                <a class="button secondary ng-binding" id="paste-btn" i18n:translate="" ng-cloak=""
-                    ng-show="hasCopyFolder" ng-click="doPaste('${bucket_name}', null, '${key_prefix}')">
-                    Paste Folder
+                <a class="button secondary ng-binding" id="paste-btn" ng-cloak=""
+                    ng-show="hasCopyItem || hasCopyFolder"
+                    ng-click="doPaste('${bucket_name}', null, '${key_prefix}')"
+                    title="Paste" i18n:attributes="title">
+                    <i class="fa fa-paste fa-lg"></i>
                 </a>
             </div>
             <div metal:fill-slot="tile_header">
@@ -76,7 +82,7 @@
             <div metal:fill-slot="tile_dropdown_button" tal:omit-tag="">
                 <a id="{{ ('tile-item-dropdown_${bucket_name}_'+item.name) | escapeHTMLTagID }}"
                    class="tiny secondary button dropdown right"
-                   data-dropdown="{{ ('item-dropdown_${bucket_name}_'+item.name) |  escapeHTMLTagID }}"><i class="fi-widget"></i></a>
+                   data-dropdown="{{ ('item-dropdown_${bucket_name}_'+item.name) |  escapeHTMLTagID }}"><i class="grid-action"></i></a>
                 <ul id="{{ ('item-dropdown_${bucket_name}_'+item.name) | escapeHTMLTagID }}" class="f-dropdown" data-dropdown-content="">
                     <li ng-show="item.is_folder">
                         <a i18n:translate="" ng-href="{{ item.absolute_path }}">View contents</a>
@@ -106,10 +112,10 @@
                         <a i18n:translate="" ng-click="doPaste('${bucket_name}', item)">Paste folder</a>
                     </li>
                     <li ng-show="item.is_folder">
-                        <a i18n:translate="" ng-click="revealModal('delete-folder', item)">Delete</a>
+                        <a class="delete-folder" i18n:translate="" ng-click="revealModal('delete-folder', item)">Delete</a>
                     </li>
                     <li ng-show="!item.is_folder">
-                        <a i18n:translate="" ng-click="revealModal('delete-object', item)">Delete</a>
+                        <a class="delete-object" i18n:translate="" ng-click="revealModal('delete-object', item)">Delete</a>
                     </li>
                 </ul>
             </div>
@@ -134,7 +140,7 @@
                     <span class="actions">
                         <a id="{{ ('table-item-dropdown_${bucket_name}_'+item.name) | escapeHTMLTagID }}"
                            class="tiny secondary button dropdown right round"
-                           data-dropdown="{{ ('item-dropdown_${bucket_name}_'+item.name) | escapeHTMLTagID }}"><i class="fi-widget"></i></a>
+                           data-dropdown="{{ ('item-dropdown_${bucket_name}_'+item.name) | escapeHTMLTagID }}"><i class="grid-action"></i></a>
                         <ul id="{{ ('item-dropdown_${bucket_name}_'+item.name) | escapeHTMLTagID }}" class="f-dropdown" data-dropdown-content="">
                             <li ng-show="item.is_folder">
                                 <a i18n:translate="" ng-href="{{ item.absolute_path }}">View contents</a>
@@ -164,10 +170,10 @@
                                 <a i18n:translate="" ng-click="doPaste('${bucket_name}', item)">Paste folder</a>
                             </li>
                             <li ng-show="item.is_folder">
-                                <a i18n:translate="" ng-click="revealModal('delete-folder', item)">Delete</a>
+                                <a class="delete-folder" i18n:translate="" ng-click="revealModal('delete-folder', item)">Delete</a>
                             </li>
                             <li ng-show="!item.is_folder">
-                                <a i18n:translate="" ng-click="revealModal('delete-object', item)">Delete</a>
+                                <a class="delete-object" i18n:translate="" ng-click="revealModal('delete-object', item)">Delete</a>
                             </li>
                         </ul>
                     </span>
@@ -183,7 +189,7 @@
                 <p>
                     <span i18n:translate="">Are you sure you want to delete all</span>&nbsp;{{ total }}&nbsp;<span i18n:translate=""> objects in </span>&nbsp;<b>${display_path}</b><span>?</span>
                 </p>
-                <a class="button expand" id="delete-all-btn" i18n:translate="" ng-click="deleteAll()">
+                <a class="button expand" id="delete-all-dialog-btn" i18n:translate="" ng-click="deleteAll()">
                     Yes, Delete Everything
                 </a>
             </div>
@@ -238,7 +244,7 @@
 </div>
 
 <div metal:fill-slot="tail_js">
-    <script src="${request.static_path('eucaconsole:static/js/pages/custom_filters.js')}"></script>
+    <script src="${request.static_path('eucaconsole:static/js/widgets/expando.js')}"></script>
     <script src="${request.static_path('eucaconsole:static/js/pages/landingpage.js')}"></script>
     <script src="${request.static_path('eucaconsole:static/js/pages/bucket_contents.js')}"></script>
 </div>

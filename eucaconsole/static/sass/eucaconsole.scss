@@ -2,7 +2,7 @@
 
 /* @fileOverview Koala application-wide Sass CSS styles */
 
-// Copyright 2013-2014 Eucalyptus Systems, Inc.
+// Copyright 2013-2016 Hewlett Packard Enterprise Development LP
 //
 // Redistribution and use of this software in source and binary forms,
 // with or without modification, are permitted provided that the following
@@ -34,8 +34,6 @@
 // This includes all of the foundation global elements that are needed to work with any of the other files.
 // Note: foundation/settings imports includes/eucavariables
 @import "includes/eucavariables";
-
-@import "font-awesome/font-awesome";
 
 // Behold, here are all the Foundation 5 components.
 @import
@@ -84,32 +82,20 @@
    Fonts
 ----------------------------------------- */
 @font-face {
-    font-family: 'Lato';
-    font-style: normal;
-    font-weight: 400;
-    src: local('Lato Regular'), local('Lato-Regular'), url(../fonts/Lato/Lato-Regular.woff) format('woff');
+    font-family: 'Metric-Regular';
+    src: url(https://hpefonts.s3.amazonaws.com/MetricWeb-Regular.woff) format('woff');
 }
 
 @font-face {
-    font-family: 'Lato';
-    font-style: normal;
-    font-weight: 700;
-    src: local('Lato Bold'), local('Lato-Bold'), url(../fonts/Lato/Lato-Bold.woff) format('woff');
+    font-family: 'Metric-Light';
+    src: url(https://hpefonts.s3.amazonaws.com/MetricWeb-Light.woff) format('woff');
+}
+@font-face {
+    font-family: 'Metric-Semibold';
+    src: url(https://hpefonts.s3.amazonaws.com/MetricWeb-Semibold.woff) format('woff');
 }
 
-@font-face {
-    font-family: 'Oswald';
-    font-style: normal;
-    font-weight: 400;
-    src: local('Oswald Regular'), local('Oswald-Regular'), url(../fonts/Oswald/Oswald-Regular.woff) format('woff');
-}
 
-@font-face {
-    font-family: 'Oswald';
-    font-style: normal;
-    font-weight: 700;
-    src: local('Oswald Bold'), local('Oswald-Bold'), url(../fonts/Oswald/Oswald-Bold.woff) format('woff');
-}
 
 /* -----------------------------------------
    Master Layout
@@ -120,23 +106,51 @@ html {
 
 body {
     position: relative;
-    color: #333;
+    color: $hpe-black;
     min-height: 100%;
     font-family: $euca-text-font-family;
     overflow-y: scroll;
 }
 
-h1, h2, h3, h4, h5, h6 {
-    font-family: $euca-header-font-family;
-    letter-spacing: 1px;
-    color: $euca-darkblue;
-}
-
-.panel {
-    h1, h2, h3, h4, h5, h6 {
-        color: $euca-darkblue;
+h1, h2, h3, h4, h5 {
+        font-family: $euca-header-font-family;
+        color: $hpe-black;
+    }
+    h6 {
+        font-family: $euca-text-font-family;
+        color: $hpe-gray;
+        text-transform: uppercase;
     }
 
+.panel {
+    h1, h2, h3, h4, h5 {
+        font-family: $euca-header-font-family;
+        color: $hpe-black;
+    }
+    h6 {
+        font-family: $euca-text-font-family;
+        color: $hpe-gray;
+        text-transform: uppercase;
+    }
+}
+
+a {
+    color: $hpe-green;
+}
+
+p {
+    color: $hpe-black;
+    font-family: $euca-text-font-family;
+    font-size: $euca-font-size;
+}
+label {
+    color: $hpe-gray;
+    font-family: $euca-text-font-family;
+    font-size: $euca-font-size;
+    cursor: default;
+    &.inline {
+        display: inline-block;
+    }
 }
 
 /* -----------------------------------------
@@ -144,15 +158,22 @@ h1, h2, h3, h4, h5, h6 {
 ----------------------------------------- */
 
 // Logo bar (top-most bar)
+#logobar-wrapper {
+    border-bottom: 1px solid $hpe-lightgray;
+}
 #logobar {
-    height: 44px;
-    padding: 5px 0 10px 15px;
-    margin-top: 20px;
+    padding: 6px 0 0 0;
+    margin-top: 8px;
     background-color: #fff;
-    color: #333;
+    font-family: $euca-header-font-family;
+    color: $hpe-black;
     a {
-        font-size: 0.9rem;
-        color: #333;
+        font-family: $euca-text-font-family;
+        font-size: $euca-font-size;
+        color: $hpe-black;
+        &:hover {
+            text-decoration: none;
+        }
     }
     section {
         position: relative;
@@ -167,14 +188,12 @@ h1, h2, h3, h4, h5, h6 {
     .dropdown {
         display: inline-block;
         margin-left: 1.3rem;
-        color: $euca-green;
+        color: $hpe-green;
         .icon {
             display: inline-block;
         }
     }
     .f-dropdown {
-        border-color: $euca-lightgreen;
-        box-shadow: 2px 2px 5px $euca-grey;
         width: auto;
         min-width: 8rem;
         &.open {
@@ -186,17 +205,13 @@ h1, h2, h3, h4, h5, h6 {
         position: relative;
         top: -10px;
     }
-    .menu-label {
-        display: block;
+    .product-name {
+        font-size: 1.4rem;
         position: relative;
-        top: -25px;
+        top: -8px;
+        padding-left: 0.5rem;
     }
-    #logo {
-        display: inline-block;
-        width: 199px; height: 55px;
-        background: url(../img/eucalogo-199x22.png) no-repeat;
-    }
-    #selected-region {
+    #selected-region.aws {
         position: relative;
         display: inline-block;
         padding-left: 24px;
@@ -209,49 +224,21 @@ h1, h2, h3, h4, h5, h6 {
         }
     }
     #offcanvas-icon {
+        left: -1000px;
         display: none;
         margin-right: 12px;
         i {
             font-size: 1.8rem;
         }
     }
+    #user-dropdown-section {
+        position: relative;
+        left: -10px;
+    }
 }
 
-// Nav bar styles
-#navbar {
-    .top-bar-section ul li > a {
-        font-family: Oswald, Helvetica, Arial, sans-serif;
-        font-size: 1.2rem;
-        padding-left: 14px;
-        padding-right: 14px;
-    }
-    border-top: 1px solid black;
-    border-bottom: 1px solid black;
-    a {
-        text-transform: uppercase;
-        font-size: 0.9rem;
-    }
-    .top-bar-section ul.dropdown li > a {
-        font-family: Lato, Helvetica, Arial, sans-serif;
-        font-size: 1rem;
-    }
-    .dropdown {
-        z-index: 999999;
-        box-shadow: 0 0 1px 1px lighten($euca-orange, 10%);
-        li {
-            a {
-                text-transform: none;
-                &:hover {
-                    background-color: #eee;
-                }
-            }
-        }
-    }
-}
 
 // Breadcrumbs
-$breadcrumb-background-color: $euca-extralightgreen;
-$breadcrumb-border-color: darken($breadcrumb-background-color, 20%);
 #breadcrumbs {
     position: relative;
     overflow: hidden;
@@ -259,15 +246,15 @@ $breadcrumb-border-color: darken($breadcrumb-background-color, 20%);
     padding-left: 16px;
     padding-top: 6px;
     padding-bottom: 1px;
-    color: $euca-darkgrey;
-    background-color: $breadcrumb-background-color;
+    color: $hpe-gray;
+    font-family: $euca-header-font-family;
     letter-spacing: 1px;
     font-weight: normal;
     li {
         margin-top: 0.3rem;
-        font-size: 0.9rem;
+        font-size: $euca-l-font-size;
         &.current a {
-            color: #444;
+            font-family: $euca-text-font-family;
         }
     }
     .icon-block{
@@ -275,19 +262,23 @@ $breadcrumb-border-color: darken($breadcrumb-background-color, 20%);
         position: absolute;
         top: 0; bottom: 0; right: 0;
         vertical-align: middle;
-        padding-top: 8px;
+        padding-bottom: 2px;
     }
     .help-icon {
         position: relative;
         padding: 8px 16px;
-        border-left: 1px solid $breadcrumb-border-color;
+        border-left: 1px solid $hpe-lightgray;
         font-weight: bold;
         text-align: center;
     }
     .breadcrumbs > ::before {
         position: relative;
-        top: -2px;
+        top: -1px;
         font-size: 0.7rem;
+    }
+    .fi-home {
+        position: relative;
+        bottom: 1px;
     }
 }
 
@@ -302,14 +293,12 @@ $breadcrumb-border-color: darken($breadcrumb-background-color, 20%);
             font-weight: bold;
             margin-right: 0.5rem;
             &:hover {
-                color: $euca-green;
                 text-decoration: underline;
             }
         }
         &.active a:hover {
             color: white;
             text-decoration: none;
-            background-color: $euca-green;
         }
     }
 }
@@ -319,7 +308,7 @@ $breadcrumb-border-color: darken($breadcrumb-background-color, 20%);
    Main Content
 ----------------------------------------- */
 #maincontent {
-    background: $euca-extralightgreen;
+    background: $hpe-backgroundgray;
     position: relative;
     padding-bottom: 3rem;
 }
@@ -332,7 +321,7 @@ $breadcrumb-border-color: darken($breadcrumb-background-color, 20%);
 
 @media screen and (min-width: $topbar-breakpoint) {
     #login-panel { margin-bottom: 5rem; }
-    #maincontent { min-height: 480px; }
+    #maincontent { min-height: 65rem; }
 }
 
 
@@ -340,8 +329,8 @@ $breadcrumb-border-color: darken($breadcrumb-background-color, 20%);
    Misc
 ----------------------------------------- */
 #pagetitle, .pagetitle {
-    font-size: 1.3rem;
-    font-weight: bold;
+    font-family: $euca-header-font-family;
+    font-size: $euca-xl-font-size;
     margin-left: 1rem;
     margin-bottom: 1rem;
     &.landingpage {
@@ -352,28 +341,24 @@ $breadcrumb-border-color: darken($breadcrumb-background-color, 20%);
     em {
         font-style: normal;
         font-weight: 700;
-        font-family: Lato, Helvetica, Arial, sans-serif;
-        color: $euca-darkgrey;
+        font-family: Metric-Regular, Helvetica, Arial, sans-serif;
+        color: $hpe-black;
     }
 }
 
 .subsection-label {
-    color: $euca-darkblue;
+    font-size: $euca-font-size;
+    color: $hpe-gray;
     margin-bottom: 6px;
 }
 
-hr {
-    border: 1px solid $euca-grey;
-    border-width: 1px 0 0;
+.upper {
+    text-transform: uppercase;
 }
 
-.busy {
-    @extend .fa;
-    @extend .fa-spinner;
-    @extend .fa-pulse;
-    .loading & {
-        @extend .fa-3x;
-    }
+hr {
+    border: 1px solid $hpe-lightgray;
+    border-width: 1px 0 0;
 }
 
 a.has-tip {
@@ -381,10 +366,15 @@ a.has-tip {
 }
 
 .tooltip {
-    font-weight: normal;
-    font-size: 0.825rem;
-    font-family: Verdana, Geneva, Helvetica, sans-serif;
+    font-family: $euca-text-font-family;
+    font-size: $euca-s-font-size;
+    border: 2px solid $hpe-lightgray;
     max-width: 260px;
+    > .nub {
+        border: 6px solid $hpe-lightgray;
+        border-color: transparent transparent $hpe-lightgray transparent;
+        top: -12px;
+    }
 }
 
 .breakword {
@@ -415,7 +405,7 @@ a.circle {
     top: -1px;
     display: inline-block;
     border-right: 6px solid transparent;
-    border-top: 6px solid $euca-green;
+    border-top: 6px solid $hpe-green;
     border-left: 6px solid transparent;
     content: '';
 }
@@ -425,7 +415,7 @@ a.circle {
     top: -1px;
     display: inline-block;
     border-right: 6px solid transparent;
-    border-bottom: 6px solid $euca-green;
+    border-bottom: 6px solid $hpe-green;
     border-left: 6px solid transparent;
     content: '';
 }
@@ -435,32 +425,107 @@ a.circle {
     margin-right: 1rem;
     margin-top: -1rem;
     font-weight: bold;
+    .marked { position: relative; }
     .alert-box {
-        background-color: $euca-notificationblue;
         position: fixed;
-        top: 10px;
-        left: 10px;
+        padding: 0 0;
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%);
         z-index: 9999999;
-        width:99%;
+        width: 100%;
+        color: $hpe-black;
+        background-color: white;
+        box-shadow: 6px 6px 10px rgba(0, 0, 0, 0.15);
         &.success {
-            background-color: $euca-notificationblue;
-            border-color: $euca-extralightblue;
+            border: 2px solid $hpe-green;
+            .icon {
+                background-color: $hpe-green;
+                span:before {
+                    content: "\2713"
+                }
+            }
         }
         &.warning {
-            color: #333;
-            background-color: lightyellow;
-            border-color: gray;
+            border: 2px solid $hp-gold;
+            .icon {
+                background-color: $hp-gold;
+                span:before {
+                    content: "\26A0"
+                }
+            }
+        }
+        &.info{
+            border: 2px solid $hpe-black;
+            .icon {
+                background-color: $hpe-black;
+                span:before {
+                    content: "\24D8"
+                }
+            }
+        }
+        &.secondary{
+            border: 2px solid $hpe-gray;
+            color: $hpe-black;
         }
         &.alert {
-            background-color: darkred;
+            border: 2px solid darkred;
+            .icon {
+                background-color: darkred;
+                span:before {
+                    content: "!"
+                }
+            }
+        }
+        .icon {
+            width: 50px;
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            text-align: center;
+            span {
+                color: white;
+                font-size: 30px;
+                transform: translateX(50%) translateY(50%);
+            }
+        }
+        .message {
+            padding: 0.875rem 2rem 0.875rem 4.5rem;
         }
         .close {
-            color: white;
-            opacity: 1.0; 
+            opacity: 1.0;
         }
         .close:hover {
             font-weight: bold;
        }
+    }
+}
+
+@media screen and (min-width: $euca-extrasmall-breakpoint) {
+    #notifications {
+        .alert-box {
+            top: 10px;
+            width: 75%;
+        }
+    }
+}
+
+@media screen and (min-width: 768px) {
+    #notifications {
+        .alert-box {
+            top: 10px;
+            width: 50%;
+        }
+    }
+}
+
+@media screen and (min-width: $topbar-breakpoint) {
+    #notifications {
+        .alert-box {
+            top: 10px;
+            width: 33%;
+        }
     }
 }
 
@@ -480,51 +545,119 @@ textarea.policy-area {
     font-weight: bold;
 }
 
+.policy-row-item {
+    vertical-align: middle;
+    padding: 0.25rem;
+}
+
+.helptext-icon {
+    color: $hpe-gray;
+    font-size: 1.2rem;
+}
+
 .expando {
     i {
-        color: $euca-green;
+        color: $hpe-gray;
+        &:hover {
+                color: $hpe-green;
+                text-decoration: none;
+        }
+        &.helptext-icon {
+            color: $hpe-gray;
+        }
     }
     .title {
-        font-size: 1.1rem;
+        font-family: $euca-text-font-family;
+        font-size: $euca-l-font-size;
+        text-transform: none;
         a {
-            color: $euca-darkblue;
+            color: $hpe-gray;
             &:hover {
-                color: $euca-green;
-                border-bottom: 1px solid $euca-green;
+                color: $hpe-green;
+                text-decoration: none;
+                border-bottom: 1px solid $hpe-green;
             }
         }
     }
 }
 
+// Action icons such as the three vertical dots
+.action-icon {
+    display: inline-block;
+    font-size: 1.4rem;
+    color: $hpe-black;
+    padding-right: 0.5rem;
+    padding-left: 0.5rem;
+    &:hover {
+        cursor: pointer;
+        color: $hpe-green;
+    }
+}
+
+.flex-space {
+    @include flexbox-mixin;
+    .flex-column-0 {
+        @include flexgrow-mixin(0);
+    }
+    .flex-column-1 {
+        @include flexgrow-mixin(1);
+    }
+}
 
 /* -----------------------------------------
    Tag editor
 ----------------------------------------- */
 #tag-editor {
     small {
-        font-size: 0.825rem;
+        font-size: $euca-s-font-size;
     }
     @include item-list;
     .propagates {
-        color: #777;
-        font-size: 0.7em;
+        color: $hpe-gray;
+        font-size: $euca-font-size;
     }
     .add-label {
         margin-bottom: 6px;
-        color: $euca-darkblue;
+        color: $hpe-gray;
+        font-family: $euca-text-font-family;
     }
     #add-tag-btn {
         margin-bottom: 0;
     }
+    &.autoscale {
+        #autoscale-tag-name-input-div, #autoscale-tag-value-input-div {
+            position: relative;
+            left: 1rem;
+        }
+        #propagate-wrapper {
+            white-space: nowrap;
+            line-height: 2.2rem;
+        }
+    }
 }
+
 
 /* -----------------------------------------
    Block device mapping (BDM) editor
 ----------------------------------------- */
 
 #bdmapping-editor {
+    .bdmapping-table {
+        width: 100%;
+        input.number {
+            padding: 0 1px 0 6px;
+        }
+    }
     th {
         padding-left: 9px;
+        &.size {
+            text-align: center;
+        }
+    }
+    td {
+        &.count {
+            text-align: center;
+        }
     }
     .storage-label {
         text-align: left;
@@ -534,8 +667,33 @@ textarea.policy-area {
             text-align: left;
         }
     }
+    #new-blockdevice-entry {
+        .chosen-single {
+            line-height: 34px;
+            min-height: 37px;
+        }
+    }
     input.number {
         width: 2rem;
+        padding: 6px 3px 5px 8px;
+        line-height: 1.5rem;
+        border: 1px solid $hpe-lightgray;
+    }
+    .delete-on-terminate {
+        text-align: center;
+        span.hide-for-small {
+            display: inline !important;
+        }
+    }
+}
+
+@media screen and (max-width: 40.063rem) {
+    #bdmapping-editor {
+        .delete-on-terminate {
+            span.hide-for-small {
+                display: none !important;
+            }
+        }
     }
 }
 
@@ -606,17 +764,17 @@ textarea.policy-area {
 
 form {
     label {
-        color: $euca-grey;
-        font-weight: bold;
+        color: $hpe-gray;
+        font-family: $euca-text-font-family;
+        font-size: $euca-font-size;
         cursor: default;
+        &.inline {
+            display: inline-block;
+        }
     }
     input {
-        background-color: $euca-extralightgreen;
-        &[type=text],
-        &[type=password],
-        &[type=number] {
-            background-color: $euca-extralightgreen;
-        }
+        border-color: $hpe-lightgray;
+        background-color: #fff;
         &[type=file] {
             background-color: transparent;
         }
@@ -627,10 +785,10 @@ form {
         }
     }
     select, textarea {
-        background-color: $euca-extralightgreen;
+        background-color: #fff;
     }
     .req {
-        color: darkred;
+        color: $hpe-gray;
     }
     .row {
         .inline-label {
@@ -639,8 +797,6 @@ form {
         input {
             &[type='text'], &[type='password'] {
                 margin: 0 0 0 0;
-                height: $euca-input-field-height;
-                line-height: $euca-input-field-height;
             }
             &[type='number'] {
                 width: 3rem;
@@ -658,7 +814,7 @@ form {
         margin-left: 2rem;
         color: $euca-grey;
         &:hover {
-            color: $euca-green;
+            color: $hpe-green;
         }
     }
     .controls_csrf_token {
@@ -666,6 +822,17 @@ form {
     }
     .server-validation span.error {
         display: block !important;
+        background-color: white;
+        color: darkred;
+        padding-left: 0;
+    }
+    &[data-abide] .error small.error {
+        background-color: white;
+        font-style: normal;
+        color: darkred;
+        &.inline {
+            display: inline-block !important;
+        }
     }
     .error .chosen-container .chosen-single {
         border-color: darkred;
@@ -684,6 +851,10 @@ form {
             text-align: left;
         }
         &.nowrap {
+            white-space: nowrap;
+        }
+        &.stack-label {
+            margin-bottom: 4px;
             white-space: nowrap;
         }
     }
@@ -711,6 +882,7 @@ form {
             margin-bottom: 0.3rem;
         }
         select {
+            font-family: $euca-text-font-family;
             margin-bottom: 0.3rem;
             margin-top: 0.3rem;
             padding-top: 6px;
@@ -725,7 +897,7 @@ form {
         margin-bottom: 0;
         label {
             position: relative;
-            right: -12px;
+            right: -15px;
         }
         .value {
             padding-bottom: 6px;
@@ -737,24 +909,37 @@ form {
             right: -6px;
         }
     }
+    &.stacked {
+        .field {
+            select, textarea {
+                margin-top: 0;
+            }
+        }
+    }
 }
 
 form .controls-wrapper > [class*='small-'] label {
     font-weight: bold;
-    padding-top: 0.3rem;
     &.right {
         position: relative;
         right: -1rem;
     }
 }
 
-[data-abide] .controls-wrapper .error {
+[data-abide] .controls-wrapper .error, [data-abide] .controls-wrapper.error {
+    label {
+        color: $hpe-black;
+    }
     input, select {
         border: 1px solid darkred;
         background-color: $euca-validation-input-bgcolor;
     }
     small.error {
         @include validation-error-mixin;
+        &.inline {
+            display: inline-block;
+            margin-left: 1rem;
+        }
     }
 }
 
@@ -769,49 +954,39 @@ textarea.hidden {
     }
 }
 
-// Help text icon for inline help on form fields
-.helptext-icon {
-    display: inline-block;
-    margin-left: 5px;
-    width: 20px; height: 20px;
-    border-radius: 32px;
-    border: 1px solid $euca-grey;
-    background-color: $euca-lightgrey;
-    color: white;
-    text-align: center;
-    padding-top: 1px;
-    font-size: 0.825rem;
-}
-
-
 /* -----------------------------------------
    Chosen widget
 ----------------------------------------- */
 .chosen-container {
     &.chosen-container-multi {
         background: none;
-        background-color: $euca-extralightgreen !important;
+        background-color: #fff !important;
         .chosen-choices  {
             background: none;
-            background-color: $euca-extralightgreen !important;
+            background-color: #fff !important;
+            border: 1px solid $hpe-lightgray;
             li {
                 &.search-field  {
                     input[type=text] {
-                        height: auto;
+                        height: 34px;
+                        padding-left: 10px;
                     }
                     .default {
                         color: #999;
                     }
                 }
                 &.search-choice {
-                    background-image: none;
-                    background-color: #d1d3d4;
-                    border: none;
-                    font-size: 0.9rem;
+                    background: #fff none;
+                    border: 2px solid $hpe-lightgray;
                     padding: 4px 20px 4px 8px;
-                    color: #555;
+                    color: $hpe-gray;
+                    font-family: $euca-header-font-family;
+                    font-size: $euca-xs-font-size;
                     .search-choice-close {
-                        top: 5px;
+                        top: 8px;
+                    }
+                    span {
+                        line-height: 20px;
                     }
                 }
             }
@@ -820,7 +995,7 @@ textarea.hidden {
     &.chosen-container-single {
         .chosen-single {
             background-image: none;
-            background-color: $euca-extralightgreen !important;
+            background-color: #fff !important;
             border-radius: 0;
             height: 2rem;
             line-height: 2rem;
@@ -832,7 +1007,13 @@ textarea.hidden {
         }
     }
     .chosen-drop .chosen-results {
-        font-size: 0.875rem;
+        font-size: $euca-font-size;
+        .active-result {
+            &.highlighted {
+                color: $hpe-black;
+                background: $hpe-hovergray none;
+            }
+        }
     }
 }
 
@@ -842,11 +1023,19 @@ textarea.hidden {
 ----------------------------------------- */
 .panel {
     background-color: white;
-    border: 0;
+    border: none;
     position: relative;
     h6 {
-        font-weight: bold;
-        color: $euca-darkblue;
+        color: $hpe-gray;
+        text-transform: uppercase;
+        font-family: $euca-text-font-family;
+        font-size: $euca-l-font-size;
+    }
+    .tabs-content {
+        border: none;
+    }
+    &.no-title {
+        margin-top: 0;
     }
     &.has-actions {
         position: relative;
@@ -856,9 +1045,8 @@ textarea.hidden {
             top: 0; left: 0; right: 0;
             line-height: 2rem;
             padding-left: 8px;
-            background-color: $euca-darkblue;
+            background-color: $hpe-black;
             color: white;
-            font-weight: normal;
             @include ellipsis-overflow;
         }
         .label.status {
@@ -870,11 +1058,13 @@ textarea.hidden {
             .button.dropdown {
                 padding: 12px 38px 12px 22px;
                 a {
-                    color: white;
+                    color: $hpe-black;
+                    &:hover { 
+                    text-decoration: none;
+                    }
                 }
             }
             .f-dropdown {
-                box-shadow: 0 0 1px 1px lighten($euca-orange, 10%);
                 min-width: 12rem;
                 width: auto;
             }
@@ -888,14 +1078,22 @@ textarea.hidden {
 
 .reveal-modal {
     z-index: 9999995;
+    [data-tooltip] {
+        z-index: 99999999;
+    }
     h3 {
-        font-weight: bold;
         &#about-cloud:hover {
-            color: $euca-green;
+            color: $hpe-green;
+        }
+        &.pagetitle {
+            margin-left: 0;
         }
     }
     form .row.controls-wrapper {
         margin-bottom: 1rem;
+    }
+    .tabs-content {
+        border: none;
     }
     .button.expand {
         margin-bottom: 0;
@@ -909,6 +1107,12 @@ textarea.hidden {
     .center {
         text-align: center;
     }
+    .close-reveal-modal {
+        &:hover {
+            color: $hpe-green;
+            text-decoration: none;
+        }
+    }
 }
 
 /* -----------------------------------------
@@ -919,6 +1123,26 @@ table.table {
     tr td {
         vertical-align: top;
     }
+    td.breakall {
+        word-break: break-all !important;
+    }
+    &.smart-table {
+        th[st-sort] {
+            padding-right: 14px;
+            &:hover {
+                cursor: pointer;
+            }
+        }
+        .st-sort-ascent, .st-sort-descent {
+            padding-right: 0 !important;
+        }
+        .st-sort-ascent:after {
+            content: '\25B2';
+        }
+        .st-sort-descent:after {
+            content: '\25BC';
+        }
+    }
 }
 
 
@@ -926,10 +1150,20 @@ table.table {
    Footer
 ----------------------------------------- */
 footer {
+    background-color: $hpe-black;
+    color: white;
     padding: 15px 0 3rem 1rem;
     .copyright {
-        font-size: 0.9em;
+        font-size: $euca-xs-font-size;
     }
+}
+
+#hpe-logo {
+    display: inline-block;
+    width: 95px;
+    height: 40px;
+    margin: 1rem 0;
+    background: url(../img/hpe_pri_grn_rev_rgb.png) no-repeat;
 }
 
 
@@ -937,47 +1171,107 @@ footer {
    Buttons
 ----------------------------------------- */
 .button {
-    background-color: $euca-orange;
-    border-color: $euca-orange;
-    &.secondary {
-        background-color: $euca-grey;
-        border-color: $euca-grey;
-        color: white;
+    background-color: #fff;
+    font-family: $euca-header-font-family;
+    text-transform: uppercase;
+    color: $hpe-black;
+    border: 2px solid $hpe-green;
+    &:hover {
+        background-color: #fff;
+        color: $hpe-black;
+        text-decoration: none;
+        outline: 2px solid $hpe-green;
     }
-    &.disabled, &[disabled] {
-        background-color: $euca-grey;
-        border-color: $euca-grey;
+    &.secondary {
+        background-color: #fff;
+        border: 2px $hpe-gray;
         &:hover {
-            background-color: $euca-grey;
-            border-color: $euca-grey;
+            background-color: #fff;
+            color: $hpe-black;
+            text-decoration: none;
+            outline: 4px solid $hpe-green;
+        }
+        font-family: $euca-header-font-family;
+        text-transform: uppercase;
+        color: $hpe-black;
+        &.disabled, &[disabled] {
+            @include disabled-button-mixin;
         }
     }
-    &:hover {
-        background-color: darken($euca-orange, 10%);
+    &.disabled, &[disabled] {
+        @include primary-disabled-button-mixin;
     }
-    &:focus {
-        background-color: $euca-orange;
+    &.tiny {
+        white-space: nowrap;
+    }
+    &.round {
+        &:hover {
+            outline: none;
+        }
+    }
+    &.dropdown {
+        &:after {
+            border-color: $hpe-black transparent transparent transparent;
+        }
     }
 }
 
 /* -----------------------------------------
-   Tabs
+   Button groups
+   (Foundation's button groups seem broken)
 ----------------------------------------- */
-.tabs {
-    dd {
-        &:first-child a {
-            box-shadow: none;
-        }
+$btn-group-radius: 10px;
+.btn-group {
+    li {
+        list-style-type: none;
+        margin: 0;
+        padding: 0;
         a {
-            color: $euca-darkblue;
-            box-shadow: inset 6px 0 4px 0 rgba(50, 50, 50, 0.2);
-            padding: 10px 32px 6px 24px;
+            display: inline-block;
+            padding: 0.2rem 1.5rem 0.3rem 1.5rem;
+            border-collapse: collapse;
+            margin: 0;
+            border: 1px solid $hp-gray-20;
             font-weight: bold;
-        }
-        &.active a {
-            box-shadow: none;
+            color: $hp-gray-65;
+            &:hover {
+                color: $hp-accessible-blue;
+            }
+            &.active {
+                color: white;
+                background-color: $hp-accessible-blue;
+            }
+            &:first-child {
+                border-top-left-radius: $btn-group-radius;
+                border-bottom-left-radius: $btn-group-radius;
+            }
+            &:last-child {
+                border-top-right-radius: $btn-group-radius;
+                border-bottom-right-radius: $btn-group-radius;
+                border-left: none;
+                position: relative;
+                left: -4px;
+            }
         }
     }
+}
+
+
+
+/* -----------------------------------------
+   Tabs (on detail pages)
+   Note: Wizard tabs are at _wizards.scss
+----------------------------------------- */
+.tabs {
+    @include standard-tabs-mixin;
+}
+
+.tabs-content {
+    background-color: white;
+    .panel {
+        border: none;
+    }
+
 }
 
 .tabs-content > .content {
@@ -1067,36 +1361,198 @@ footer {
                 top: 8px; right: 0;
             }
         }
-    }
-}
-
-@media screen and (max-width: 640px) {
-    #logo {
-        width: 20px !important;
-    }
-}
-
-// Nav bar adjustments
-@media screen {
-    #logobar {
-        //border-bottom: 1px solid black;
-        margin-top: 8px;
-        .dropdown {
-            position: relative;
-            top: 4px;
+        .product-name {
+            display: none;
         }
         #offcanvas-icon {
+            left: 0;
             display: inline-block !important;
             margin-right: 12px;
-        }
-        #user-dropdown-section {
-            position: relative;
-            left: -10px;
+            i {
+                padding-right: 0.5rem;
+            }
         }
     }
-    #navbar {
+    .left-nav {
         display: none;
     }
+    .inner-wrap {
+        padding-left: 0 !important;
+    }
+}
+
+div.left-nav {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    z-index: 999999 !important;
+    background-color: white;
+    overflow: hidden;
+    border-style: solid;
+    border-width: 0 1px 0 0;
+    border-color: $hpe-lightgray;
+}
+
+// Off-canvas Nav adjustments
+div.left-off-canvas-menu {
+    z-index: 999999 !important;
+    background-color: white;
+    border: 0 solid $hpe-lightgray;
+    border-right-width: 1px;
+}
+
+.off-canvas-wrap {
+    min-height: 100%;
+}
+
+$expanded-nav-width: 225px;
+
+.left-nav {
+    width: $expanded-nav-width !important;
+    overflow-y: scroll !important;
+    transition: width 0.3s;
+}
+
+.inner-wrap {
+    padding-left: 50px;
+}
+
+.nav-collapsed.left-nav {
+    width: 50px !important;
+    overflow-y: hidden !important;
+    label {
+        visibility: hidden;
+    }
+    hr {
+        width: 7.5%;
+    }
+}
+
+ul.resources-nav {
+    width: $expanded-nav-width*2;
+    list-style-type: none;
+    line-height: 3.0rem;
+    margin-left: 0;
+    left: 0;
+    label {
+        padding-left: 0.5rem;
+        background-color: white;
+        color: $hpe-gray;
+        padding-top: 0.5rem;
+        border-top: 0;
+    }
+    hr {
+        margin: 0 0.5rem 0 0.5rem;
+        width: 42.5%;
+    }
+    li {
+        a {
+            background-color: transparent;
+            color: $hpe-gray;
+            padding: 0.5rem 8rem 1.0rem 2.6rem;
+            line-height: 1.5rem;
+            border-bottom: 0;
+            position: static;
+        }
+        &:hover {
+            background-color: $hpe-hovergray;
+            color: $hpe-gray;
+        }
+        span {
+            padding-left: 0.5rem;
+            white-space: nowrap;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        span.active {
+            background-color: $hpe-green;
+            color: white;
+        }
+        i.icon {
+            position: absolute;
+            left: 0.5rem;
+            margin-top: 0.5rem;
+            height: 2rem;
+            width: 2rem;
+        }
+        i.icon.accounts { background-image: url(../img/nav/Accounts.svg); }
+        i.icon.accounts.active { background-image: url(../img/nav/Accounts_Active_40x40.svg); }
+        i.icon.alarms { background-image: url(../img/nav/Elastic-IP.svg); }
+        i.icon.alarms.active { background-image: url(../img/nav/Elastic-IP_Active.svg); }
+        i.icon.buckets { background-image: url(../img/nav/Bucket.svg); }
+        i.icon.buckets.active { background-image: url(../img/nav/Bucket_Active.svg); }
+        i.icon.dashboard { background-image: url(../img/nav/Dashboard.svg); }
+        i.icon.dashboard.active { background-image: url(../img/nav/Dashboard_Active.svg); }
+        i.icon.ipaddresses { background-image: url(../img/nav/Elastic-IP.svg); }
+        i.icon.ipaddresses.active { background-image: url(../img/nav/Elastic-IP_Active.svg); }
+        i.icon.groups { background-image: url(../img/nav/Groups.svg); }
+        i.icon.groups.active { background-image: url(../img/nav/Groups_Active.svg); }
+        i.icon.images { background-image: url(../img/nav/Images.svg); }
+        i.icon.images.active { background-image: url(../img/nav/Images_Active.svg); }
+        i.icon.instances { background-image: url(../img/nav/Instances.svg); }
+        i.icon.instances.active { background-image: url(../img/nav/Instances_Active.svg); }
+        i.icon.keypairs { background-image: url(../img/nav/Key-Pairs.svg); }
+        i.icon.keypairs.active { background-image: url(../img/nav/Key-Pairs_Active.svg); }
+        i.icon.launchconfigs { background-image: url(../img/nav/Launch-configs.svg); }
+        i.icon.launchconfigs.active { background-image: url(../img/nav/Launch-configs_Active.svg); }
+        i.icon.elbs { background-image: url(../img/nav/Load-Balance.svg); }
+        i.icon.elbs.active { background-image: url(../img/nav/Load-Balance_Active.svg); }
+        i.icon.metrics { background-image: url(../img/nav/Launch-configs.svg); }
+        i.icon.metrics.active { background-image: url(../img/nav/Launch-configs_Active.svg); }
+        i.icon.roles { background-image: url(../img/nav/Roles.svg); }
+        i.icon.roles.active { background-image: url(../img/nav/Roles_Active.svg); }
+        i.icon.scalinggroups { background-image: url(../img/nav/Auto-Scaling-Groups.svg); }
+        i.icon.scalinggroups.active { background-image: url(../img/nav/Auto-Scaling-Groups_Active.svg); }
+        i.icon.securitygroups { background-image: url(../img/nav/Security.svg); }
+        i.icon.securitygroups.active { background-image: url(../img/nav/Security_Active.svg); }
+        i.icon.snapshots { background-image: url(../img/nav/Snapshots.svg); }
+        i.icon.snapshots.active { background-image: url(../img/nav/Snapshots_Active.svg); }
+        i.icon.stacks { background-image: url(../img/nav/stacks.svg); }
+        i.icon.stacks.active { background-image: url(../img/nav/stacks_Active.svg); }
+        i.icon.users { background-image: url(../img/nav/Users.svg); }
+        i.icon.users.active { background-image: url(../img/nav/Users_Active.svg); }
+        i.icon.instance-types { background-image: url(../img/nav/VM-Types.svg); }
+        i.icon.instance-types.active { background-image: url(../img/nav/VM-Types_Active.svg); }
+        i.icon.volumes { background-image: url(../img/nav/Volumes.svg); }
+        i.icon.volumes.active { background-image: url(../img/nav/Volumes_Active.svg); }
+    }
+}
+
+/* IE 10+ specific adjustments */
+@media screen and (-ms-high-contrast: active), (-ms-high-contrast: none) {
+    ul.resources-nav {
+        hr {
+            margin-left: -15rem;
+        }
+        li {
+            a {
+                i.icon {
+                    height: 2.2rem;
+                }
+            }
+        }
+    }
+    .nav-collapsed.left-nav {
+        hr {
+            margin-left: -24.5rem;
+        }
+    }
+}
+
+ul.bullet-list {
+    list-style-type: none;
+    li:before {
+        font-family: 'FontAwesome';
+        font-size: 0.9rem;
+        content: '\f138';
+        margin: 0 5px 0 -15px;
+        color: $hp-accessible-blue;
+    }
+}
+
+.columns.subheading {
+    padding-left: 0.125rem;
 }
 
 /* Responsive tweaks for landing page title */

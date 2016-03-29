@@ -3,10 +3,11 @@
  * @requires AngularJS
  *
  */
-angular.module('TagEditor', ['ngSanitize', 'EucaConsoleUtils'])
+angular.module('TagEditor', ['ngSanitize', 'EucaConsoleUtils', 'FormComponents'])
     .filter('ellipsis', function () {
         return function (line, num) {
-            if( line.length <= num ){
+            if (!line) return line;
+            if (line.length <= num) {
                 return line;
             }
             return line.substring(0, num) + "...";
@@ -134,9 +135,10 @@ angular.module('TagEditor', ['ngSanitize', 'EucaConsoleUtils'])
                 existingTagFound = false,
                 form = $($event.currentTarget).closest('form');
             if (tagKeyField.val() && tagValueField.val()) {
-                // disallow adding tags starting with aws:. abide handles
+                // disallow adding tags starting with aws: or euca:. abide handles
                 // alerting the user
-                if (tagKeyField.val().indexOf("aws:") === 0) {
+                if (tagKeyField.val().indexOf("aws:") === 0 ||
+                    tagKeyField.val().indexOf("euca:") === 0) {
                     return false;
                 }
                 // Avoid adding a new tag if the name duplicates an existing one.
@@ -176,6 +178,8 @@ angular.module('TagEditor', ['ngSanitize', 'EucaConsoleUtils'])
                 $scope.isTagNotComplete = true;
             } else if ($('#tag-name-input-div').hasClass('error') ||
                 $('#tag-value-input-div').hasClass('error')) {
+                $scope.isTagNotComplete = true;
+            } else if ($scope.tagEditorForm.$invalid) {
                 $scope.isTagNotComplete = true;
             } else {
                 $scope.isTagNotComplete = false;

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2013-2014 Eucalyptus Systems, Inc.
+# Copyright 2013-2015 Hewlett Packard Enterprise Development LP
 #
 # Redistribution and use of this software in source and binary forms,
 # with or without modification, are permitted provided that the following
@@ -72,8 +72,9 @@ class BucketMixinTestCase(BaseViewTestCase):
         request = testing.DummyRequest()
         request.environ = {'PATH_INFO': "some/path//with/extra/slash"}
         request.subpath = ('some', 'path', 'with', 'extra', 'slash')
+        request.matchdict['name'] = 'bucket'
         view = BucketXHRView(request)
-        new_subpath = view.get_subpath()
+        new_subpath = view.get_subpath('bucket')
         self.assertEqual(request.environ['PATH_INFO'], "/".join(new_subpath))
 
 
@@ -151,11 +152,10 @@ class MockBucketDetailsViewTestCase(BaseViewTestCase, MockBucketMixin):
 class MockBucketContentsJsonViewTestCase(BaseViewTestCase, MockBucketMixin):
 
     @mock_s3
-    def test_bucket_contents_view_with_file(self):
-        request = self.create_request(matchdict=dict(name='test_bucket'))
-        request.params['csrf_token'] = request.session.get_csrf_token()
+    def test_bucket_contents_json_view_with_file(self):
         bucket, bucket_acl = self.make_bucket()
         bucket.new_key("/file-one").set_contents_from_string('file content')
+        request = self.create_request(matchdict=dict(name=bucket.name))
         view = BucketContentsJsonView(request, bucket=bucket)
         bucket_contents_json_view = view.bucket_contents_json()
         results = bucket_contents_json_view.get('results')
@@ -166,11 +166,10 @@ class MockBucketContentsJsonViewTestCase(BaseViewTestCase, MockBucketMixin):
         self.assertEqual(item.get('is_folder'), False)
 
     @mock_s3
-    def test_bucket_contents_view_with_folder(self):
-        request = self.create_request(matchdict=dict(name='test_bucket'))
-        request.params['csrf_token'] = request.session.get_csrf_token()
+    def test_bucket_contents_json_view_with_folder(self):
         bucket, bucket_acl = self.make_bucket()
         bucket.new_key("/folder-one/").set_contents_from_string('')
+        request = self.create_request(matchdict=dict(name=bucket.name))
         view = BucketContentsJsonView(request, bucket=bucket)
         bucket_contents_json_view = view.bucket_contents_json()
         results = bucket_contents_json_view.get('results')
@@ -182,6 +181,26 @@ class MockBucketContentsJsonViewTestCase(BaseViewTestCase, MockBucketMixin):
         self.assertEqual(item.get('icon'), 'fi-folder')
         self.assertEqual(item.get('size'), 0)
         self.assertEqual(item.get('download_url'), '')
+
+
+class MockBucketContentsViewTestCase(BaseViewTestCase, MockBucketMixin):
+
+    @mock_s3
+    def test_bucket_contents_view_with_bucket(self):
+        bucket, bucket_acl = self.make_bucket()
+        request = self.create_request(matchdict=dict(name=bucket.name))
+        view = BucketContentsView(request, bucket_name=bucket.name).bucket_contents()
+        self.assertEqual(view.get('display_path'), 'test_bucket')
+
+    @mock_s3
+    def test_bucket_contents_view_with_folder(self):
+        bucket, bucket_acl = self.make_bucket()
+        bucket.new_key("/folder-one/").set_contents_from_string('')
+        request = self.create_request(matchdict=dict(name=bucket.name))
+        request.environ = {'PATH_INFO': u'test_bucket/folder-one'}
+        request.subpath = ('folder-one', )
+        view = BucketContentsView(request, bucket=bucket).bucket_contents()
+        self.assertEqual(view.get('display_path'), 'folder-one')
 
 
 class MockObjectDetailsViewTestCase(BaseViewTestCase, MockBucketMixin):

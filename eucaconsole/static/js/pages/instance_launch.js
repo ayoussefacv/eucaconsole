@@ -54,6 +54,8 @@ angular.module('LaunchInstance', ['TagEditor', 'BlockDeviceMappingEditor', 'Imag
         $scope.existsImage = true;
         $scope.imageIDErrorClass = '';
         $scope.imageIDNonexistErrorClass = '';
+        $scope.monitoringEnabled = true;
+        $scope.monitoringType = 'basic';
         $scope.initController = function (optionsJson) {
             var options = JSON.parse(eucaUnescapeJson(optionsJson));
             $scope.keyPairChoices = options.keypair_choices;
@@ -72,6 +74,7 @@ angular.module('LaunchInstance', ['TagEditor', 'BlockDeviceMappingEditor', 'Imag
             $scope.preventFormSubmitOnEnter();
             $scope.initChosenSelectors();
             $scope.watchTags();
+            $scope.watchBdMapping();
             $scope.focusEnterImageID();
             $scope.setWatcher();
         };
@@ -116,10 +119,13 @@ angular.module('LaunchInstance', ['TagEditor', 'BlockDeviceMappingEditor', 'Imag
             $scope.imageID = $scope.urlParams.image_id || '';
             if( $scope.imageID === '' ){
                 $scope.currentStepIndex = 1;
-            }else{
+            } else {
                 $scope.currentStepIndex = 2;
                 $scope.step1Invalid = false;
                 $scope.loadImageInfo($scope.imageID);
+                $timeout(function() {
+                    document.getElementById('tabStep2').click();
+                });
             }
         };
         $scope.restoreSecurityGroupsInitialValues = function () {
@@ -161,11 +167,17 @@ angular.module('LaunchInstance', ['TagEditor', 'BlockDeviceMappingEditor', 'Imag
                     $scope.updateTagsPreview();
                 });
                 $scope.tagsObject = JSON.parse(tagsJson);
+                $scope.tagsLength = Object.keys($scope.tagsObject).length;
             }, 300);
         };
         $scope.watchTags = function () {
             $scope.$on('tagUpdate', function () {
                 $scope.updateTagsPreview();
+            });
+        };
+        $scope.watchBdMapping = function () {
+            $scope.$on('bdMappingChange', function (evt, args) {
+                $scope.additionalStorageConfigured = args;
             });
         };
         $scope.checkRequiredInput = function () {
@@ -407,6 +419,7 @@ angular.module('LaunchInstance', ['TagEditor', 'BlockDeviceMappingEditor', 'Imag
                 $scope.summarySection.find('.step' + nextStep).removeClass('hide');
                 $scope.currentStepIndex = nextStep;
                 $scope.checkRequiredInput();
+                $scope.isHelpExpanded = false;
             },50);
         };
         $scope.clearErrors = function(step) {

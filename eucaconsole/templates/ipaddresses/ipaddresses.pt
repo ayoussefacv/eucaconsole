@@ -5,7 +5,7 @@
 </head>
 
 <div metal:fill-slot="main_content" ng-app="ElasticIPsPage" ng-controller="ElasticIPsCtrl" ng-init="initController()">
-    <div class="row" id="contentwrap" ng-app="LandingPage" ng-controller="ItemsCtrl"
+    <div class="row" id="contentwrap" ng-controller="ItemsCtrl"
          ng-init="initController('ipaddresses', '${initial_sort_key}', '${json_items_endpoint}')">
         <metal:breadcrumbs metal:use-macro="layout.global_macros['breadcrumbs']">
             <metal:crumbs metal:fill-slot="crumbs">
@@ -17,13 +17,32 @@
         <h3 id="pagetitle"><strong i18n:translate="">Elastic IPs</strong></h3>
         <div metal:use-macro="layout.global_macros['landing_page_datagrid']">
             <div metal:fill-slot="new_button">
-                <a class="button" id="allocate-ipaddresses-btn"
-                   data-reveal-id="allocate-ip-modal" i18n:translate="">
+                <a class="button" id="allocate-ipaddresses-btn" data-reveal-id="allocate-ip-modal" i18n:translate="">
                     Allocate Elastic IP Addresses
                 </a>
+                <metal:block metal:use-macro="layout.global_macros['more_actions']">
+                    <div metal:fill-slot="menu_items" tal:omit-tag="">
+                        <li>
+                            <a i18n:translate="" ng-click="revealReleaseIPsModal((items | filter:{ selected: true }))"
+                               class="more-actions-release">
+                                Release to cloud
+                            </a>
+                        </li>
+                        <li ng-class="{'disabled': (items | filter: {selected: true} | attachedOnly).length &lt; 1}">
+                            <a i18n:translate="" ng-click="revealDisassociateIPsModal((items | filter:{ selected: true }))"
+                               class="more-actions-disassociate">
+                                Disassociate from instance
+                            </a>
+                        </li>
+                    </div>
+                </metal:block>
+                <metal:block metal:use-macro="layout.global_macros['selectall_items_checkbox']" />
             </div>
             <div metal:fill-slot="tile_header">
-                <a ng-href="${prefix}/{{ item.public_ip }}">{{ item.public_ip }}</a>
+                <span metal:use-macro="layout.global_macros['select_item_checkbox']"></span>
+                <a ng-href="${prefix}/{{ item.public_ip }}" class="has-checkbox">
+                    {{ item.public_ip }}
+                </a>
             </div>
             <div metal:fill-slot="tile_content" tal:omit-tag="">
                 <div>
@@ -45,7 +64,8 @@
                 </div>
             </div>
             <div metal:fill-slot="tile_dropdown_button" tal:omit-tag="">
-                <a id="tile-item-dropdown_{{ item.public_ip | escapeHTMLTagID }}" class="tiny secondary button dropdown right" data-dropdown="item-dropdown_{{ item.public_ip |  escapeHTMLTagID }}"><i class="fi-widget"></i></a>
+                <a id="tile-item-dropdown_{{ item.public_ip | escapeHTMLTagID }}" class="tiny secondary button dropdown right"
+                   data-dropdown="item-dropdown_{{ item.public_ip |  escapeHTMLTagID }}"><i class="grid-action"></i></a>
                 <ul id="item-dropdown_{{ item.public_ip | escapeHTMLTagID }}" class="f-dropdown" data-dropdown-content="">
                     <li ng-show="item.instance_id">
                         <a i18n:translate=""
@@ -62,12 +82,14 @@
                 </ul>
             </div>
             <metal:block metal:fill-slot="tableview_headers">
+                <th metal:use-macro="layout.global_macros['selectall_header_checkbox']"></th>
                 <th i18n:translate="">Public IP address</th>
                 <th i18n:translate="">Scope</th>
                 <th i18n:translate="">Assigned to instance</th>
                 <th i18n:translate="" class="actions">Actions</th>
             </metal:block>
             <metal:block metal:fill-slot="tableview_columns">
+                <td><metal:block metal:use-macro="layout.global_macros['select_item_checkbox']" /></td>
                 <td><a ng-href="${prefix}/{{ item.public_ip }}">{{ item.public_ip }}</a></td>
                 <td tal:condition="is_vpc_supported">
                     <span ng-show="item.domain == 'vpc'" i18n:translate="">VPC</span>
@@ -79,7 +101,8 @@
                 <td class="breakword"><a ng-href="/instances/{{item.instance_id}}">{{ item.instance_name | ellipsis: 30 }}</a></td>
                 <td>
                     <span class="actions">
-                        <a id="table-item-dropdown_{{ item.public_ip | escapeHTMLTagID }}" class="tiny secondary button dropdown right round" data-dropdown="item-dropdown_{{ item.public_ip | escapeHTMLTagID }}"><i class="fi-widget"></i></a>
+                        <a id="table-item-dropdown_{{ item.public_ip | escapeHTMLTagID }}" class="tiny secondary button dropdown right round"
+                           data-dropdown="item-dropdown_{{ item.public_ip | escapeHTMLTagID }}"><i class="grid-action"></i></a>
                         <ul id="item-dropdown_{{ item.public_ip | escapeHTMLTagID }}" class="f-dropdown" data-dropdown-content="">
                             <li ng-show="item.instance_id">
                                 <a i18n:translate=""
@@ -89,7 +112,7 @@
                                 <a i18n:translate=""
                                    ng-click="revealModal('associate', item)">Associate with instance</a>
                             </li>
-                            <li ng-show="!item.instance_id"><a i18n:translate=""
+                            <li ng-show="!item.instance_id"><a i18n:translate="" class="action-release"
                                    ng-click="revealModal('release', item)">Release to cloud</a>
                             </li>
                         </ul>
@@ -98,7 +121,7 @@
             </metal:block>
         </div>
         <!--! Modal dialogs -->
-        <div id="allocate-ip-modal" class="reveal-modal small" data-reveal="">
+        <div id="allocate-ip-modal" class="reveal-modal medium" data-reveal="">
             <h3 i18n:translate="">Allocate elastic IP addresses</h3>
             <p> Once you allocate elastic IP addresses from the cloud, you may associate them with your instances.
                 The number of addresses allocated from the cloud may be fewer than you request, and will be limited to the maximum number
@@ -109,19 +132,25 @@
                  tal:define="html_attrs {'pattern': '^[1-9]\d*$', 'min': '1',
                          'error_msg': allocate_ip_dialog_error_message};">
                 ${structure:allocate_form['csrf_token']}
-                <div tal:condition="cloud_type == 'aws'">
-                    ${panel('form_field', field=allocate_form.domain, leftcol_width=6, rightcol_width=6)}
-                </div>
-                <div tal:condition="cloud_type == 'euca'">
-                    <div class="row controls-wrapper readonly" id="controls_domain">
-                        <div class="small-6 columns">
-                            <label class="right" i18n:translate="">Scope&nbsp;</label>
+                <div class="row">
+                    <div class="large-4 small-4 columns">
+                        <div tal:condition="cloud_type == 'aws'">
+                            ${panel('form_field', field=allocate_form.domain, stack_label=True)}
                         </div>
-                        <div tal:condition="not is_vpc_supported" class="small-6 columns value" i18n:translate="">Standard</div>
-                        <div tal:condition="is_vpc_supported" class="small-6 columns value" i18n:translate="">VPC</div>
+                        <div tal:condition="cloud_type == 'euca'">
+                            <div class="row inline stacked controls-wrapper readonly" id="controls_domain">
+                                <div class="columns">
+                                    <label class="left stack-label" i18n:translate="">Scope&nbsp;</label>
+                                </div>
+                                <div tal:condition="not is_vpc_supported" class="large-12 small-12 columns value" i18n:translate="">Standard</div>
+                                <div tal:condition="is_vpc_supported" class="large-12 small-12 columns value" i18n:translate="">VPC</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="large-7 large-offset-1 small-7 small-offset-1 columns">
+                        ${panel('form_field', field=allocate_form.ipcount, stack_label=True, **html_attrs)}
                     </div>
                 </div>
-                ${panel('form_field', field=allocate_form.ipcount, leftcol_width=6, rightcol_width=6, **html_attrs)}
                 <div>
                     <label>
                         <span class="req">*</span>
@@ -133,7 +162,7 @@
                         i18n:translate="">Allocate Addresses From Cloud</button>
                 </div>
                 <div class="dialog-progress-display hide">
-                    <span i18n:translate="">Sending request </span>&nbsp;<em><span class="busy">&nbsp;</span></em>
+                    <span i18n:translate="">Sending request </span>&nbsp;<i class="busy"></i>
                 </div>
             </form>
             <a class="close-reveal-modal">&#215;</a>
@@ -152,7 +181,7 @@
 <div metal:fill-slot="tail_js">
     <script src="${request.static_path('eucaconsole:static/js/thirdparty/jquery/chosen.jquery.min.js')}"></script>
     <script src="${request.static_path('eucaconsole:static/js/thirdparty/utils/purl.js')}"></script>
-    <script src="${request.static_path('eucaconsole:static/js/pages/custom_filters.js')}"></script>
+    <script src="${request.static_path('eucaconsole:static/js/widgets/expando.js')}"></script>
     <script src="${request.static_path('eucaconsole:static/js/pages/landingpage.js')}"></script>
     <script src="${request.static_path('eucaconsole:static/js/pages/ipaddresses.js')}"></script>
 </div>

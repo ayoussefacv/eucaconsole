@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2013-2014 Eucalyptus Systems, Inc.
+# Copyright 2013-2015 Hewlett Packard Enterprise Development LP
 #
 # Redistribution and use of this software in source and binary forms,
 # with or without modification, are permitted provided that the following
@@ -46,32 +46,36 @@ from pyramid.view import view_config
 
 from ..forms.buckets import (
     BucketDetailsForm, BucketItemDetailsForm, SharingPanelForm, BucketUpdateVersioningForm,
-    MetadataForm, CreateBucketForm, CreateFolderForm, BucketDeleteForm, BucketUploadForm
-)
+    MetadataForm, CreateBucketForm, CreateFolderForm, BucketDeleteForm, BucketUploadForm,
+    BucketItemSharedURLForm)
 from ..i18n import _
 from ..models import Notification
 from ..views import BaseView, LandingPageView, JSONResponse
 from . import boto_error_handler
+from .. import utils
 
 
 DELIMITER = '/'
 BUCKET_ITEM_URL_EXPIRES = 300  # Link to item expires in ___ seconds (after page load)
 BUCKET_NAME_PATTERN = '^[a-z0-9-\.]+$'
 FOLDER_NAME_PATTERN = '^[^\/]+$'
+OBJECT_PATH_PATTERN = '^[a-z0-9-\.]+/.+$'
 
 
 class BucketMixin(object):
 
     @staticmethod
-    def real_path(request):
+    def real_path(request, bucket_name):
         if len(request.subpath) == 0:
             return ''
         path = request.environ['PATH_INFO'].decode('utf-8')
+        if request.subpath[0] in bucket_name:
+            path = path[path.index(bucket_name) + len(bucket_name):]
         path = path[path.index(request.subpath[0]):] if len(request.subpath) > 0 else ''
         return path
 
-    def get_subpath(self):
-        path = BucketMixin.real_path(self.request)
+    def get_subpath(self, bucket_name):
+        path = BucketMixin.real_path(self.request, bucket_name)
         subpath = []
         if path != '':
             if path.endswith('/'):  # and not path.endswith('//'):
@@ -86,7 +90,7 @@ class BucketsView(LandingPageView):
 
     def __init__(self, request):
         super(BucketsView, self).__init__(request)
-        # self.items = self.get_items()  # Only need this when filters are displayed on the landing page
+        self.title_parts = [_(u'Buckets')]
         self.prefix = '/buckets'
         self.location = self.get_redirect_location('buckets')
         self.sort_keys = [
@@ -95,6 +99,13 @@ class BucketsView(LandingPageView):
             dict(key='creation_date', name=_(u'Creation time: Oldest to Newest')),
             dict(key='-creation_date', name=_(u'Creation time: Newest to Oldest')),
         ]
+        s3_conn = self.get_connection(conn_type='s3')
+        s3_url_prefix = "https://{host}:{port}/{path}/".format(
+            host=s3_conn.host,
+            port=s3_conn.port,
+            path=s3_conn.path
+        )
+        storage_key = self.get_shared_buckets_storage_key(s3_conn.host)
         self.render_dict = dict(
             prefix=self.prefix,
             versioning_form=BucketUpdateVersioningForm(request, formdata=self.request.params or None),
@@ -102,10 +113,13 @@ class BucketsView(LandingPageView):
             initial_sort_key='bucket_name',
             json_items_endpoint=self.get_json_endpoint('buckets_json'),
             sort_keys=self.sort_keys,
-            filter_fields=False,
             filter_keys=['bucket_name'],
-            controller_options_json=self.get_controller_options_json(),
+            controller_options_json=self.get_controller_options_json(storage_key),
             search_facets=BaseView.escape_json(json.dumps([])),
+            bucket_name_pattern=BUCKET_NAME_PATTERN,
+            object_path_pattern=OBJECT_PATH_PATTERN,
+            object_url_prefix=s3_url_prefix,
+            storage_key=storage_key
         )
 
     @view_config(route_name='buckets', renderer=VIEW_TEMPLATE)
@@ -127,7 +141,7 @@ class BucketsView(LandingPageView):
             return HTTPFound(location=self.request.route_path('buckets'))
         return self.render_dict
 
-    def get_controller_options_json(self):
+    def get_controller_options_json(self, storage_key):
         return BaseView.escape_json(json.dumps({
             'bucket_objects_count_url': self.request.route_path('bucket_objects_count_versioning_json', name='_name_'),
             'update_versioning_url': self.request.route_path('bucket_update_versioning', name='_name_'),
@@ -135,6 +149,9 @@ class BucketsView(LandingPageView):
             'get_keys_generic_url': self.request.route_path('bucket_keys', name='_name_', subpath='_subpath_'),
             'put_keys_url': self.request.route_path('bucket_put_items', name='_name_', subpath='_subpath_'),
             'upload_url': self.request.route_path('bucket_upload', name='_name_', subpath=''),
+            'contents_url': self.request.route_path('bucket_contents', name='_name_', subpath=''),
+            'bucket_item_url': self.request.route_path('bucket_item_url', name='_name_', subpath='_subpath_'),
+            'storage_key': storage_key
         }))
 
 
@@ -186,8 +203,10 @@ class BucketXHRView(BaseView, BucketMixin):
     def __init__(self, request):
         super(BucketXHRView, self).__init__(request)
         self.s3_conn = self.get_connection(conn_type='s3')
+        if self.s3_conn:
+            self.s3_conn.suppress_consec_slashes = False
         self.bucket_name = request.matchdict.get('name')
-        request.subpath = self.get_subpath()
+        request.subpath = self.get_subpath(self.bucket_name)
 
     @view_config(route_name='bucket_delete_keys', renderer='json', request_method='POST', xhr=True)
     def bucket_delete_keys(self):
@@ -201,24 +220,23 @@ class BucketXHRView(BaseView, BucketMixin):
         if not keys:
             return dict(message=_(u"keys must be specified."), errors=[])
         bucket = self.s3_conn.head_bucket(self.bucket_name)
-        errors = []
         deleted_keys = ', '.join(keys) if isinstance(keys, list) else keys
         self.log_request(u"Deleting keys from {0} : {1}".format(self.bucket_name, deleted_keys))
-        for k in keys.split(','):
-            key = bucket.get_key(k, validate=False)
-            try:
-                key.delete()
-            except BotoServerError as err:
-                self.log_request("Couldn't delete "+k+":"+err.message)
-                errors.append(k)
-        if len(errors) == 0:
-            success_msg = _(u"Successfully deleted key(s).")
-            if detailpage:
-                # Send notification via session on detail page since post-delete URL updates via window.location
-                self.request.session.flash(success_msg, queue=Notification.SUCCESS)
-            return dict(message=success_msg)
-        else:
-            return dict(message=_(u"Failed to delete all keys."), errors=errors)
+        with boto_error_handler(self.request):
+            result = bucket.delete_keys(keys.split(','))
+            if result.errors:
+                msg = _(u"Some key(s) couldn't be deleted. ") + \
+                    ','.join([err.key + '(' + err.message + ')' for err in result.errors])
+                if detailpage:
+                    # Send notification via session on detail page since post-delete URL updates via window.location
+                    self.request.session.flash(msg, queue=Notification.ERROR)
+                return dict(errors=msg)
+            else:
+                msg = _(u"Successfully deleted key(s).")
+                if detailpage:
+                    # Send notification via session on detail page since post-delete URL updates via window.location
+                    self.request.session.flash(msg, queue=Notification.SUCCESS)
+                return dict(message=msg)
 
     @view_config(route_name='bucket_put_items', renderer='json', request_method='POST', xhr=True)
     def bucket_put_items(self):
@@ -244,7 +262,7 @@ class BucketXHRView(BaseView, BucketMixin):
                         src_key_name=k
                     )
                 except BotoServerError as err:
-                    self.log_request("Couldn't copy "+k+":"+err.message)
+                    self.log_request("Couldn't copy " + k + ":" + err.message)
                     errors.append(k)
             if len(errors) == 0:
                 return dict(message=_(u"Successfully copied object(s)."))
@@ -259,7 +277,7 @@ class BucketXHRView(BaseView, BucketMixin):
         subpath = self.request.subpath
         src_bucket = self.request.params.get('src_bucket')
         src_key = self.request.params.get('src_key')
-        dest_key = '/'.join(subpath) + '/' + src_key[src_key.rfind('/')+1:]
+        dest_key = '/'.join(subpath) + '/' + src_key[src_key.rfind('/') + 1:]
         with boto_error_handler(self.request):
             self.log_request(u"Copying key from {0}:{1} to {2}:{3}".format(
                 src_bucket, src_key, self.bucket_name, dest_key))
@@ -301,15 +319,17 @@ class BucketContentsView(LandingPageView, BucketMixin):
     """Views for actions on single bucket"""
     VIEW_TEMPLATE = '../templates/buckets/bucket_contents.pt'
 
-    def __init__(self, request):
-        super(BucketContentsView, self).__init__(request)
+    def __init__(self, request, bucket_name=None, **kwargs):
+        super(BucketContentsView, self).__init__(request, **kwargs)
+        self.title_parts = [_(u'Bucket'), request.matchdict.get('name')]
         self.s3_conn = self.get_connection(conn_type='s3')
-        request.subpath = self.get_subpath()
+        self.bucket_name = bucket_name or self.get_bucket_name(request)
+        request.subpath = self.get_subpath(self.bucket_name)
         self.prefix = '/buckets'
-        self.bucket_name = self.get_bucket_name(request)
         self.create_folder_form = CreateFolderForm(request, formdata=self.request.params or None)
         self.subpath = request.subpath
         self.key_prefix = '/'.join(self.subpath) if len(self.subpath) > 0 else ''
+        self.title_parts.append(self.key_prefix)
         self.file_uploads_enabled = asbool(self.request.registry.settings.get('file.uploads.enabled', True))
         self.render_dict = dict(
             bucket_name=self.bucket_name,
@@ -329,17 +349,32 @@ class BucketContentsView(LandingPageView, BucketMixin):
             dict(key='-last_modified', name=_(u'Modified time: Newest to Oldest')),
             dict(key='last_modified', name=_(u'Modified time: Oldest to Newest ')),
         ]
+        # if shared bucket, we'd like to check permissions and send back to buckets page if none
+        try:
+            if self.s3_conn:
+                self.s3_conn.get_bucket(self.bucket_name).list(prefix='notlikely')
+        except BotoServerError as err:
+            # 404: not found
+            if err.status == 404:
+                msg = _(u'Bucket does not exist')
+            # 403: forbidden
+            if err.status == 403:
+                msg = _(
+                    u'You do not have the required permissions to perform this operation. '
+                    u'Please contact your cloud administrator to request an updated access policy.'
+                )
+            self.request.session.flash(msg, queue=Notification.ERROR)
+            return HTTPFound(location=self.request.route_path('buckets'))
         json_route_path = self.request.route_path('bucket_contents', name=self.bucket_name, subpath=self.subpath)
         if len(self.subpath) > 0 and self.subpath[-1] == '':
             json_route_path += '/'
         self.render_dict.update(
             prefix=self.prefix,
             key_prefix=self.key_prefix,
-            display_path=self.key_prefix,
+            display_path=self.key_prefix or self.bucket_name,
             initial_sort_key='name',
             json_items_endpoint=u"{0}?{1}".format(json_route_path, self.key_prefix),
             sort_keys=self.sort_keys,
-            filter_fields=False,
             filter_keys=['name'],
             search_facets=BaseView.escape_json(json.dumps([])),
             controller_options_json=self.get_controller_options_json(),
@@ -348,24 +383,39 @@ class BucketContentsView(LandingPageView, BucketMixin):
 
     @view_config(route_name='bucket_upload', renderer='../templates/buckets/bucket_upload.pt', request_method='GET')
     def bucket_upload(self):
+        self.title_parts.append(_(u'Upload'))
         if not self.file_uploads_enabled:
             raise HTTPNotFound()  # Return 404 if file uploads are disabled
         with boto_error_handler(self.request):
-            bucket = BucketContentsView.get_bucket(self.request, self.s3_conn)
-            if not hasattr(bucket, 'metadata'):
-                bucket.metadata = {}
-            acl_obj = Key(bucket, '')
-            sharing_form = SharingPanelForm(
-                self.request, bucket_object=acl_obj, sharing_acl=None, formdata=self.request.params or None)
             metadata_form = MetadataForm(self.request, formdata=self.request.params or None)
-            self.render_dict.update(
-                bucket=bucket,
-                bucket_name=bucket.name,
-                acl_obj=acl_obj,
-                upload_form=BucketUploadForm(self.request),
-                sharing_form=sharing_form,
-                metadata_form=metadata_form,
-            )
+            if self.bucket_name != '__shared__':
+                bucket = BucketContentsView.get_bucket(self.request, self.s3_conn)
+                if not hasattr(bucket, 'metadata'):
+                    bucket.metadata = {}
+                acl_obj = Key(bucket, '')
+                sharing_form = SharingPanelForm(
+                    self.request, bucket_object=acl_obj, sharing_acl=None, formdata=self.request.params or None)
+                self.render_dict.update(
+                    bucket=bucket,
+                    bucket_name=bucket.name,
+                    acl_obj=acl_obj,
+                    upload_form=BucketUploadForm(self.request),
+                    sharing_form=sharing_form,
+                    metadata_form=metadata_form,
+                )
+            else:
+                acl_obj = None
+                sharing_form = SharingPanelForm(
+                    self.request, bucket_object=acl_obj, sharing_acl=None, formdata=self.request.params or None)
+                self.render_dict.update(
+                    bucket=None,
+                    bucket_name=self.bucket_name,
+                    upload_form=BucketUploadForm(self.request),
+                    acl_obj=acl_obj,
+                    sharing_form=sharing_form,
+                    metadata_form=metadata_form,
+                    object_path_pattern=OBJECT_PATH_PATTERN,
+                )
         return self.render_dict
 
     @view_config(route_name='bucket_upload', renderer='json', request_method='POST', xhr=True)
@@ -375,15 +425,31 @@ class BucketContentsView(LandingPageView, BucketMixin):
         if not(self.is_csrf_valid()):
             return JSONResponse(status=400, message="missing CSRF token")
         bucket_name = self.request.matchdict.get('name')
+        shared_object_path = self.request.params.get('shared-object-path')
+        folder = None
+        if shared_object_path is not None:
+            if shared_object_path.find('/') == -1:
+                bucket_name = shared_object_path
+                folder = ''
+            else:
+                bucket_name = shared_object_path[:shared_object_path.find('/')]
+                folder = shared_object_path[shared_object_path.find('/') + 1:]
         files = self.request.POST.getall('files')
         with boto_error_handler(self.request):
-            bucket = self.s3_conn.get_bucket(bucket_name)
+            bucket = self.s3_conn.get_bucket(bucket_name, validate=False)
             for upload_file in files:
                 upload_file.file.seek(0, 2)  # seek to end
                 if upload_file.file.tell() > 5000000000:
-                    return JSONResponse(status=400, message=_(u"File too large :")+upload_file.filename)
+                    return JSONResponse(status=400, message=_(u"File too large :") + upload_file.filename)
                 upload_file.file.seek(0, 0)  # seek to start
-                bucket_item = bucket.new_key("/".join(self.request.subpath))
+                if folder:
+                    if folder == '':
+                        the_key = upload_file.filename
+                    else:
+                        the_key = "{0}/{1}".format(folder, upload_file.filename)
+                else:
+                    the_key = "/".join(self.request.subpath)
+                bucket_item = bucket.new_key(the_key)
                 self.log_request(u"Uploading file {0} to bucket {1}".format(bucket_item.key, bucket_name))
                 bucket_item.set_metadata('Content-Type', upload_file.type)
                 headers = {'Content-Type': upload_file.type}
@@ -536,7 +602,7 @@ class BucketContentsJsonView(BaseView, BucketMixin):
             if self.s3_conn and self.bucket is None:
                 self.bucket = BucketContentsView.get_bucket(request, self.s3_conn)
         self.bucket_name = self.bucket.name
-        request.subpath = self.get_subpath()
+        request.subpath = self.get_subpath(self.bucket_name)
         self.subpath = request.subpath
 
     @view_config(route_name='bucket_contents', renderer='json', request_method='POST', xhr=True)
@@ -616,13 +682,14 @@ class BucketDetailsView(BaseView, BucketMixin):
 
     def __init__(self, request, bucket=None, bucket_acl=None, **kwargs):
         super(BucketDetailsView, self).__init__(request, **kwargs)
+        self.title_parts = [_(u'Bucket'), request.matchdict.get('name'), _(u'Details')]
         self.s3_conn = self.get_connection(conn_type='s3')
         self.bucket = bucket
         self.bucket_acl = bucket_acl
-        request.subpath = self.get_subpath()
         with boto_error_handler(request):
             if self.s3_conn and self.bucket is None:
                 self.bucket = BucketContentsView.get_bucket(request, self.s3_conn)
+            request.subpath = self.get_subpath(self.bucket.name) if self.bucket else ''
             if self.bucket and self.bucket_acl is None:
                 self.bucket_acl = self.bucket.get_acl() if self.bucket else None
         self.details_form = BucketDetailsForm(request, formdata=self.request.params or None)
@@ -784,13 +851,15 @@ class BucketItemDetailsView(BaseView, BucketMixin):
 
     def __init__(self, request, bucket=None, bucket_item_acl=None, **kwargs):
         super(BucketItemDetailsView, self).__init__(request, **kwargs)
+        self.title_parts = [_(u'Bucket'), request.matchdict.get('name')]
         self.bucket = bucket
         self.bucket_item_acl = bucket_item_acl
         self.s3_conn = self.get_connection(conn_type='s3')
-        request.subpath = self.get_subpath()
         with boto_error_handler(request):
             if self.s3_conn and self.bucket is None:
                 self.bucket = BucketContentsView.get_bucket(request, self.s3_conn)
+                self.s3_conn.suppress_consec_slashes = False
+            request.subpath = self.get_subpath(self.bucket.name)
             self.bucket_name = self.bucket.name
             self.bucket_item = self.get_bucket_item()
             if self.s3_conn and self.bucket_item_acl is None:
@@ -801,6 +870,7 @@ class BucketItemDetailsView(BaseView, BucketMixin):
         self.friendly_name_param = self.request.params.get('friendly_name')
         self.name_updated = True if self.friendly_name_param and self.friendly_name_param != unprefixed_name else False
         self.bucket_item_name = self.bucket_item.name
+        self.title_parts.append(self.bucket_item_name)
         self.details_form = BucketItemDetailsForm(
             request, bucket_object=self.bucket_item, unprefixed_name=unprefixed_name,
             formdata=self.request.params or None
@@ -810,20 +880,25 @@ class BucketItemDetailsView(BaseView, BucketMixin):
             formdata=self.request.params or None)
         self.versioning_form = BucketUpdateVersioningForm(request, formdata=self.request.params or None)
         self.metadata_form = MetadataForm(request, formdata=self.request.params or None)
+        self.shared_url_form = BucketItemSharedURLForm(request, formdata=self.request.params or None)
         self.render_dict = dict(
             sharing_form=self.sharing_form,
             details_form=self.details_form,
             versioning_form=self.versioning_form,
             metadata_form=self.metadata_form,
+            shared_url_form=self.shared_url_form,
             bucket=self.bucket,
             bucket_name=self.bucket.name,
             bucket_item=self.bucket_item,
             last_modified=self.get_last_modified_time(self.bucket_item),
             key_name=self.bucket_item.name,
             item_name=unprefixed_name,
-            item_link=self.bucket_item.generate_url(expires_in=BUCKET_ITEM_URL_EXPIRES),
+            item_link=self.get_unsigned_url(),
+            item_is_public=self.get_public_status(grants=self.bucket_item_acl.acl.grants),
+            item_open_url=self.bucket_item.generate_url(expires_in=BUCKET_ITEM_URL_EXPIRES),
             item_download_url=BucketContentsView.get_item_download_url(self.bucket_item),
             cancel_link_url=self.get_cancel_link_url(),
+            ufshost_error=utils.is_ufshost_error(self.s3_conn, self.cloud_type)
         )
 
     def get_controller_options_json(self):
@@ -833,6 +908,8 @@ class BucketItemDetailsView(BaseView, BucketMixin):
                 'bucket_contents', name=self.bucket_name, subpath=self.request.subpath[:-1]),
             'make_object_public_url': self.request.route_path(
                 'bucket_item_make_public', name=self.bucket_name, subpath='_subpath_'),
+            'bucket_item_generate_url_endpoint': self.request.route_path(
+                'bucket_item_generate_url', name=self.bucket_name, subpath=self.request.subpath),
             'bucket_item_key': self.bucket_item_name,
             'unprefixed_key': BucketContentsView.get_unprefixed_key_name(self.bucket_item.name)
         }))
@@ -869,6 +946,14 @@ class BucketItemDetailsView(BaseView, BucketMixin):
             self.request.error_messages = self.details_form.get_errors_list()
         return self.render_dict
 
+    @view_config(route_name='bucket_item_generate_url', renderer='json', request_method='POST')
+    def bucket_item_generate_url(self):
+        item = self.get_bucket_item()
+        expiration = int(self.request.params.get('expiration', 3600))
+        return dict(
+            shared_link=item.generate_url(expires_in=expiration)
+        )
+
     def get_bucket_item(self):
         subpath = self.request.subpath
         item_key_name = DELIMITER.join(subpath)
@@ -876,6 +961,27 @@ class BucketItemDetailsView(BaseView, BucketMixin):
         if item is None:  # Folder requires the trailing slash, which request.subpath omits
             item = self.bucket.get_key(u'{0}/'.format(item_key_name))
         return item
+
+    def get_unsigned_url(self):
+        """Returns unsigned URL for object with query string removed"""
+        item_url = self.bucket_item.generate_url(expires_in=0, query_auth=False)
+        return item_url.split('?')[0]
+
+    @staticmethod
+    def get_public_status(grants=None):
+        """Determine whether an object is public based on its ACL grants
+        :type grants: list
+        :param grants: List of boto.s3.acl.Grant objects
+        :returns: True if object is public, else False
+        :rtype: bool
+
+        """
+        all_users_uri = 'http://acs.amazonaws.com/groups/global/AllUsers'
+        grants = grants or []
+        for grant in grants:
+            if grant.uri and grant.uri == all_users_uri:
+                return True
+        return False
 
     def update_metadata(self):
         """Update metadata and remove deleted metadata"""
@@ -967,12 +1073,30 @@ class BucketItemDetailsView(BaseView, BucketMixin):
     @classmethod
     def get_extended_metadata(cls, bucket_item):
         """Extend object metadata with metadata-like attributes"""
-        metadata = bucket_item.metadata
+        metadata = bucket_item.metadata if bucket_item else {}
         metadata_attr_mapping = cls.attribute_metadata_mapping()
         for attr in metadata_attr_mapping:
             if getattr(bucket_item, attr, None):
                 metadata[metadata_attr_mapping[attr]] = getattr(bucket_item, attr)
         return metadata
+
+
+class BucketSharedItemView(BaseView, BucketMixin):
+    def __init__(self, request, bucket=None, bucket_item_acl=None, **kwargs):
+        super(BucketSharedItemView, self).__init__(request, **kwargs)
+        self.bucket = bucket
+        s3_conn = self.get_connection(conn_type='s3')
+        request.subpath = self.get_subpath(self.bucket.name)
+        if s3_conn and self.bucket is None:
+            bucket_name = request.matchdict.get('name')
+            self.bucket = s3_conn.get_bucket(bucket_name, validate=False)
+            self.bucket_item = self.bucket.get_key('/'.join(request.subpath), validate=False)
+
+    @view_config(route_name='bucket_item_url', renderer='json', request_method='POST', xhr=True)
+    def bucket_item_url(self):
+        return dict(
+            item_link=BucketContentsView.get_item_download_url(self.bucket_item),
+        )
 
 
 class CreateBucketView(BaseView):
@@ -999,7 +1123,8 @@ class CreateBucketView(BaseView):
     @view_config(route_name='bucket_create', renderer=VIEW_TEMPLATE, request_method='POST')
     def bucket_create(self):
         if self.create_form.validate():
-            bucket_name = self.request.params.get('bucket_name').lower()
+            bucket_name = self.request.params.get('bucket_name')
+            bucket_name = bucket_name.strip().lower()
             enable_versioning = self.request.params.get('enable_versioning') == 'y'
             location = self.request.route_path('bucket_details', name=bucket_name)
             with boto_error_handler(self.request, self.request.route_path('buckets')):
@@ -1029,3 +1154,34 @@ class CreateBucketView(BaseView):
 
     def get_existing_bucket_names(self):
         return [bucket.name for bucket in self.s3_conn.get_all_buckets()]
+
+
+class CreateBucketXHRView(BaseView):
+    """Views for creating a bucket via XHR from non-bucket pages (e.g. ELB detail page)"""
+
+    def __init__(self, request):
+        super(CreateBucketXHRView, self).__init__(request)
+        with boto_error_handler(request):
+            self.s3_conn = self.get_connection(conn_type='s3')
+        self.create_form = CreateBucketForm(request, formdata=self.request.params or None)
+
+    @view_config(route_name='bucket_create_xhr', renderer='json', request_method='POST')
+    def bucket_create_xhr(self):
+        if self.create_form.validate():
+            bucket_name = self.request.params.get('bucket_name').lower()
+            if bucket_name in [bucket.name for bucket in self.s3_conn.get_all_buckets()]:
+                conflict_message = _(
+                    u'The bucket name you have entered conflicts with an existing bucket in your account. '
+                    u'Please use a different name.')
+                return JSONResponse(status=409, message=conflict_message)
+            self.log_request(u"Creating bucket {0}".format(bucket_name))
+            try:
+                self.s3_conn.create_bucket(bucket_name)
+                msg = u'{0} {1}'.format(_(u'Successfully created'), bucket_name)
+                return JSONResponse(message=msg)
+            except StorageCreateError as err:
+                # Handle bucket name conflict
+                return JSONResponse(status=409, message=err.message)
+        else:
+            error_messages = ', '.join(self.create_form.get_errors_list())
+            return JSONResponse(status=400, message=error_messages)

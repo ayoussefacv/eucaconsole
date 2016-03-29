@@ -5,8 +5,8 @@
  */
 
 // Add Scaling Group Policy page includes the Create Alarm dialog, so pull in that module
-angular.module('ScalingGroupPolicy', ['CreateAlarm'])
-    .controller('ScalingGroupPolicyCtrl', function ($rootScope, $scope) {
+angular.module('ScalingGroupPolicy', ['CreateAlarm', 'EucaConsoleUtils'])
+    .controller('ScalingGroupPolicyCtrl', function ($rootScope, $scope, eucaNumbersOnly) {
         $scope.alarmModal = $('#create-alarm-modal');
         $scope.policyForm = $('#add-policy-form');
         $rootScope.alarmChoices = {};
@@ -41,14 +41,36 @@ angular.module('ScalingGroupPolicy', ['CreateAlarm'])
             $scope.$watch('policyName', function () {
                 $scope.checkRequiredInput();
             });
-            $scope.$watch('adjustmentAmount', function () {
+            $scope.$watch('adjustmentAmount', function (newVal) {
+                if(newVal) {
+                    $scope.adjustmentAmount = eucaNumbersOnly(newVal);
+                    $scope.isNotValid = false;
+                } else {
+                    $scope.isNotValid = true;
+                }
                 $scope.checkRequiredInput();
             });
-            $scope.$watch('coolDown', function () {
+            $scope.$watch('coolDown', function (newVal) {
+                if(newVal) {
+                    $scope.coolDown = eucaNumbersOnly(newVal);
+                    $scope.isNotValid = false;
+                } else {
+                    $scope.isNotValid = true;
+                }
                 $scope.checkRequiredInput();
             });
             $scope.$watch('alarm', function () {
                 $scope.checkRequiredInput();
+            });
+
+            $scope.$on('alarm_created', function ($event, promise) {
+                promise.then(function success (result) {
+                    // Add new alarm to choices and set it as selected
+                    var newAlarm = result.data && result.data.new_alarm;
+                    $rootScope.alarmChoices[newAlarm] = newAlarm;
+                    $rootScope.alarm = newAlarm;
+                    $scope.isCreatingAlarm = false;
+                });
             });
         };
         $scope.setFocus = function () {

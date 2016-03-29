@@ -1,6 +1,6 @@
 // Eucalyptus Sass variables
 
-// Copyright 2013-2014 Eucalyptus Systems, Inc.
+// Copyright 2013-2015 Hewlett Packard Enterprise Development LP
 //
 // Redistribution and use of this software in source and binary forms,
 // with or without modification, are permitted provided that the following
@@ -34,6 +34,24 @@ $experimental: false;
 $euca-extrasmall-breakpoint: 480px;
 $euca-contentwrap-width: 1040px;
 
+// HPE Colors
+$hpe-black: #333333;
+$hpe-gray: #666666;
+$hpe-lightgray: #cccccc;
+$hpe-backgroundgray: #F2F2F2; 
+$hpe-hovergray: #F0F0F0;
+$hpe-disabledgray: #EDEDED;
+$hpe-disabledgreen: #CCEEE6;
+$hpe-black: #000000;
+$hpe-green: #01a982;
+$hpe-slate: #425563;
+$hpe-turq: #2ad2c9;
+$hpe-purple: #614767;
+$hpe-bronze: #80746E;
+$hpe-steel: #5F7A76;
+$hpe-orange: #FF8D6D;
+
+
 // Colors
 $euca-darkblue: #03405f;
 $euca-extralightblue: #ecf4f7;
@@ -58,17 +76,39 @@ $aws-orange: #ff9900;
 $euca-validation-error-color: darkred;
 $euca-validation-input-bgcolor: lighten(lightpink, 10%);
 
+// HP accessible palette styles
+$hp-accessible-blue: #007dba;
+$hp-hover-blue: #006699;
+$hp-hover-orange: #c1401a;
+$hp-gray-65: #5a5a5a;
+$hp-gray-40: #b3b3b3;
+$hp-gray-20: #cccccc;
+$hp-gray-5: #f2f2f2;
+$hp-red: #ff0000;
+$hp-light-red: #f7d7d7;
+$hp-border-radius: 8px;
+
+// HP secondary styles 
+$hp-orange: #d7410b;
+$hp-green: #008424;
+$hp-purple: #822980;
+
+// Additional colors used with HP palette
+$hp-gold: #e6a818;
+
 // Forms
 $euca-input-field-height: 2rem;
 
 // Text
-$body-font-family: Verdana, Geneva, Lucida, "Lucida Grande", Helvetica, Arial, sans-serif;
-$euca-text-font-family: Lato, Helvetica, Arial, sans-serif;
-$euca-header-font-family: Oswald, Helvetica, Arial, sans-serif;
-$euca-header-font: "Trebuchet MS", "Droid Sans", "Helvetica Nueue", Helvetica, sans-serif;
-$euca-font-size: 0.8125rem;
-$euca-text-color: #333;
-$euca-link-color: darken($euca-darkgreen, 10%);
+$euca-text-font-family: Metric-Regular, Helvetica, Arial, sans-serif;
+$euca-header-font-family: Metric-Semibold, Helvetica, Arial, sans-serif;
+$euca-xs-font-size: 12px;
+$euca-s-font-size: 14px;
+$euca-font-size: 16px;
+$euca-l-font-size: 18px;
+$euca-xl-font-size: 24px;
+$euca-text-color: $hpe-black;
+$euca-link-color: $hpe-green;
 
 // Prevent Google Fonts API call
 $include-open-sans: false;
@@ -77,7 +117,10 @@ $include-open-sans: false;
 $euca-footer-height: 80px;
 
 // Misc decorations
-$euca-box-shadow: 0 2px 2px 0 $euca-grey;
+$euca-box-shadow: 0 2px 2px 0 $hpe-hovergray;
+
+// Wizards
+$wizard-tab-padding: 8px 1rem;
 
 
 // ####################
@@ -87,14 +130,14 @@ $euca-box-shadow: 0 2px 2px 0 $euca-grey;
 $row-width: rem-calc(1040);
 
 // Colors
-$primary-color: $euca-green;
-$secondary-color: $euca-grey;
-$success-color: $euca-lightgreen;
+$primary-color: $hpe-green;
+$secondary-color: $hpe-gray;
+$success-color: $hpe-green;
 $code-color: darkred;
 
 // Dropdown menus
-$f-dropdown-bg: #fff;
-$f-dropdown-triangle-color: #fff;
+$f-dropdown-bg: white;
+$f-dropdown-triangle-color: $hpe-lightgray;
 
 // Navigation bar settings ============
 // Breakpoint handling
@@ -103,9 +146,8 @@ $topbar-breakpoint: 1020px !default; // Change to 9999px for always mobile layou
 // Colors
 $topbar-bg-color: white;
 $topbar-bg: $topbar-bg-color;
-$topbar-dropdown-bg: $euca-orange;
-$topbar-dropdown-link-bg: $euca-green;
-$topbar-link-bg-hover: $euca-darkgreen;
+$topbar-dropdown-link-bg: $hpe-green;
+$topbar-link-bg-hover: $hpe-green;
 /* Dropdown elements */
 $topbar-dropdown-bg: white;
 $topbar-dropdown-link-color: #000;
@@ -121,13 +163,8 @@ $topbar-link-color-active-hover: #fff;
 $topbar-link-weight: normal;
 $topbar-link-font-size: rem-calc(13);
 $topbar-link-hover-lightness: -10%; // Darken by 10%
-$topbar-link-bg-hover: $euca-orange;
-$topbar-link-bg-active: $euca-orange;
 $topbar-link-bg-active-hover: $primary-color;
-$topbar-link-font-family: $body-font-family;
 
-// Sub-nav
-$sub-nav-active-bg: $euca-darkblue;
 
 // Breadcrumbs
 $crumb-bg: transparent;
@@ -139,33 +176,40 @@ $crumb-border-style: solid;
 $crumb-border-color: transparent;
 $crumb-radius: 0;
 $crumb-font-size: 1.1rem;
-$crumb-font-color: $primary-color;
-$crumb-font-color-current: #333;
+$crumb-font-color: $hpe-gray;
+$crumb-font-family-current: $euca-text-font-family;
 $crumb-font-color-unavailable: #999;
 $crumb-font-transform: normal;
 $crumb-link-decor: underline;
-$crumb-slash-color: #333;
-$crumb-slash: ">";
+$crumb-slash-color: $hpe-gray;
+$crumb-slash: "/";
 
 // Buttons
 $button-tny: rem-calc(6);
 $button-sml: rem-calc(8);
 $button-med: rem-calc(10);
 $button-lrg: rem-calc(12);
-$button-border-width: 1px;
+$button-border-width: 2px;
 $button-border-style: solid;
 
 // Tables
-$table-even-row-bg: #f5f5f5;
+$table-even-row-bg: #white;
 
 // Tabs
 $tabs-navigation-padding: rem-calc(4) !default;
-$tabs-navigation-bg-color: $euca-green;
+$tabs-navigation-bg-color: transparent;
 $tabs-content-margin-bottom: rem-calc(1) !default;
-$tabs-navigation-hover-bg-color: lighten($tabs-navigation-bg-color, 5%);
+
 
 // Tooltips
+$tooltip-bg: white;
+$tooltip-font-color: $hpe-gray;
 $tooltip-padding: rem-calc(5);
+
+// Alarm status colors
+$alarm-status-color-alarm: $hp-red;
+$alarm-status-color-insufficient-data: $hp-gray-65;
+$alarm-status-color-ok: $hp-green;
 
 // Mixins
 // Text overflow (e.g. for handling long resource names)
@@ -178,7 +222,7 @@ $tooltip-padding: rem-calc(5);
 // Tiles within panels (e.g. instance_volumes.pt and volume_snapshots.pt page)
 @mixin panel-tile-mixin {
     background-color: white;
-    border: 1px solid $euca-lightgrey;
+    border: 1px solid $hpe-lightgray;
     width: 190px; height: 160px;
     .footer {
         height: 24px;
@@ -187,12 +231,48 @@ $tooltip-padding: rem-calc(5);
 }
 
 @mixin button-shadow-mixin {
-    box-shadow: 1px 1px 5px 0px lighten($euca-grey, 10%);
+    box-shadow: 1px 1px 5px 0 $hpe-hovergray;
+}
+
+@mixin disabled-button-mixin {
+    background-color: white;
+    border-color: $hpe-disabledgray;
+    color: $hpe-disabledgray;
+        &:hover {
+            background-color: white;
+            text-decoration: none;
+            border: 2px $hpe-disabledgray;
+            outline: none;
+            color: $hpe-disabledgray;
+
+        }
+}
+
+@mixin primary-disabled-button-mixin {
+    background-color: white;
+    border-color: $hpe-disabledgreen;
+    color: $hpe-disabledgray;
+        &:hover {
+            background-color: white;
+            border-color: $hpe-disabledgreen;
+            text-decoration: none;
+            border-width: 2px;
+            color: $hpe-disabledgray;
+
+        }
 }
 
 @mixin dropdown-shadow-mixin {
-    border-color: $euca-lightgreen;
-    box-shadow: 2px 2px 5px $euca-grey;
+    border-color: $hpe-lightgray;
+    box-shadow: 2px 2px 5px $hpe-hovergray;
+}
+
+@mixin helptext-icon-position-mixin {
+    .helptext-icon {
+        position: relative;
+        left: -1rem;
+        color: $hpe-gray;
+    }
 }
 
 @mixin validation-error-mixin {
@@ -208,15 +288,16 @@ $tooltip-padding: rem-calc(5);
 @mixin table-styles-mixin {
     border: none;
     thead tr {
-        background-color: #f5f5f5;
+        background-color: white;
         th {
             // Note: Do not use shorthand padding rules here since we need to override Foundation styles
             padding-top: 0.5rem;
             padding-bottom: 0.5rem;
             padding-left: 6px;
             padding-right: 6px;
+            border-bottom: 1px solid $hpe-lightgray;
             vertical-align: top;
-            color: $euca-darkgrey;
+            color: $hpe-black;
             text-transform: uppercase;
             &.actions {
                 text-align: right;
@@ -224,14 +305,29 @@ $tooltip-padding: rem-calc(5);
             &.count {
                 text-align: center;
             }
+            &.checkbox-header {
+                width: 1.5rem;
+            }
         }
     }
     tr {
-        border-bottom: 1px solid #ddd;
+        border-bottom: 1px solid $hpe-lightgray;
         td.count {
             text-align: center;
         }
     }
+}
+
+
+// Flexbox mixins //
+@mixin flexbox-mixin {
+    display: -ms-flexbox; // IE10
+    display: -webkit-flex; // Safari 7+
+    display: flex;
+}
+@mixin flexgrow-mixin($amount:1) {
+    -webkit-flex-grow: $amount;  // Safari 7+ and IE10
+    flex-grow: $amount;
 }
 
 /* -----------------------------------------
@@ -241,13 +337,99 @@ $tooltip-padding: rem-calc(5);
     .item-list {
         margin-bottom: 6px;
         .item {
-            color: #333;
-            background-color: $euca-extralightgrey;
+            color: $hpe-gray;
+            font-family: $euca-text-font-family;
+            border: 2px solid $hpe-lightgray;
+            background-color: #fff;
             margin-right: 8px;
             a {
-                color: white;
+                color: $hpe-gray;
+                &:hover {
+                color: $hpe-green;
+                text-decoration: none;
+                }
             }
         }
+    }
+}
+
+// Tab mixins (wizards, etc.)
+@mixin standard-tabs-mixin {
+    max-height: 2.6rem !important;
+    dd {
+        position: relative;
+        top: 1px;
+        z-index: 999;
+        a {
+            padding: 10px 32px 6px 24px;
+            color: $hpe-gray;
+            background-color: transparent;
+            font-family: $euca-header-font-family;
+            &:hover {
+                border-bottom: 2px solid $hpe-gray;
+                background-color: transparent;
+                text-decoration: none;
+            }
+        }
+        &.active {
+            a {
+                color: $hpe-black;
+                font-family: $euca-header-font-family;
+                background-color: transparent;
+                border-bottom: 2px solid $hpe-black;
+            }
+        }
+    }
+}
+
+@mixin wizard-tabs-mixin {
+    a {  // Visited tabs
+        color: $hpe-gray;
+        font-family: $euca-header-font-family;
+        background-color: transparent;
+        &:hover {
+            color: $hpe-gray;
+            border-bottom: 2px solid $hpe-gray;
+        }
+        box-shadow: none;
+        white-space: nowrap;
+        padding: $wizard-tab-padding;
+        .cir {
+            background-color: $hpe-gray;
+        }
+    }
+    &.active {  // Active tab
+        a {
+            color: $hpe-black;
+            font-family: $euca-header-font-family;
+            background-color: transparent;
+            border-bottom: 2px solid $hpe-black;
+        }
+        .cir {
+            background-color: $hpe-black;
+        }
+    }
+    &.disabled {  // Unvisited tabs
+        color: $hpe-lightgray;
+        font-family: $euca-header-font-family;
+        padding: $wizard-tab-padding;
+        .cir {
+            margin-right: 8px;
+        }
+    }
+    .cir {
+        position: relative;
+        top: -2px;
+        font-size: 0.825rem;
+        display: inline-block;
+        border-radius: 60px;
+        width: 20px; height: 20px;
+        padding: 0 0 0 0;
+        text-align: center;
+        vertical-align: middle;
+        background-color: $hpe-lightgray;
+        color: white;
+        margin-right: 4px;
     }
 }
 

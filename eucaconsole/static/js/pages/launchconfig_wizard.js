@@ -49,6 +49,7 @@ angular.module('LaunchConfigWizard', ['ImagePicker', 'BlockDeviceMappingEditor',
         $scope.existsImage = true;
         $scope.imageIDErrorClass = '';
         $scope.imageIDNonexistErrorClass = '';
+        $scope.monitoringEnabled = true;
         $scope.initController = function (optionsJson) {
             var options = JSON.parse(eucaUnescapeJson(optionsJson));
             $scope.keyPairChoices = options.keypair_choices;
@@ -155,8 +156,16 @@ angular.module('LaunchConfigWizard', ['ImagePicker', 'BlockDeviceMappingEditor',
                 $scope.currentStepIndex = 2;
                 $scope.step1Invalid = false;
                 $scope.loadImageInfo($scope.imageID);
+                $timeout(function() {
+                    document.getElementById('tabStep2').click();
+                    document.getElementById('name').focus();
+                });
             }
             $scope.isCreateSGChecked = $('#create_sg_from_lc').is(':checked');
+            if ($("#userdata").val().length > 0) {
+                $scope.inputtype = "text";
+                $scope.userData = $("#userdata").val();
+            }
         };
         $scope.restoreSecurityGroupsInitialValues = function () {
             $scope.securityGroupSelected = $scope.urlParams.security_group || '';
@@ -293,11 +302,13 @@ angular.module('LaunchConfigWizard', ['ImagePicker', 'BlockDeviceMappingEditor',
                     chosenSelect.trigger("chosen:updated");
                 }
             });
-            $scope.$watch('inputtype', function() {
-                if ($scope.inputtype == 'text') {
-                    $timeout(function() {
-                        $('#userdata').focus();
-                    });
+            $scope.$watch('inputtype', function(newValue, oldValue) {
+                if (newValue != oldValue) {
+                    if ($scope.inputtype == 'text') {
+                        $timeout(function() {
+                            $('#userdata').focus();
+                        });
+                    }
                 }
             });
         };
@@ -317,31 +328,6 @@ angular.module('LaunchConfigWizard', ['ImagePicker', 'BlockDeviceMappingEditor',
                 $scope.$broadcast('setBDM', item.block_device_mapping);
                 $scope.existsImage = true;
                 $scope.imageIDNonexistErrorClass = "";
-                if (item.root_device_type == 'ebs') {
-                    // adjust vmtypes menu
-                    var rootSize = item.block_device_mapping[item.root_device_name].size;
-                    var selectedOne = false;
-                    angular.forEach($('#instance_type option'), function(value, idx) {
-                        var text = value.text;
-                        var size = text.split(',')[2].trim();
-                        size = size.substring(0, size.indexOf(' '));
-                        if (size < rootSize) {  // disable entries that won't fit
-                            value.disabled = true;
-                        }
-                        else {
-                            value.disabled = false;
-                            if (!selectedOne) {  // select first one that fits
-                                value.selected = true;
-                                selectedOne = true;
-                            }
-                        }
-                    });
-                }
-                else {
-                    angular.forEach($('#instance_type option'), function(value, idx) {
-                        value.disabled = false;
-                    });
-                }
             }).error(function (oData) {
                 $scope.existsImage = false;
                 $scope.imageIDNonexistErrorClass = "error";
@@ -421,6 +407,7 @@ angular.module('LaunchConfigWizard', ['ImagePicker', 'BlockDeviceMappingEditor',
                 $scope.summarySection.find('.step' + nextStep).removeClass('hide');
                 $scope.currentStepIndex = nextStep;
                 $scope.checkRequiredInput();
+                $scope.isHelpExpanded = false;
             },50);
         };
         $scope.clearErrors = function(step) {

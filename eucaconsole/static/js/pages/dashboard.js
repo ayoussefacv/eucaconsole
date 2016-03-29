@@ -23,11 +23,13 @@ angular.module('Dashboard', ['EucaConsoleUtils'])
             $scope.jsonEndpoint = options.json_items_url;
             $scope.statusEndpoint = options.service_status_url;
             $scope.storedZoneKey = 'dashboard_availability_zone_' + options.cloud_type;
+            $scope.cloudType = options.cloud_type;
             $scope.accountName = options.account_display_name;
+            $scope.storageKey = options.storage_key + "shared_buckets";
             $scope.setInitialZone();
             $scope.setFocus();
             $scope.getItemCounts();
-            $scope.storeAWSRegion();
+            $scope.storeRegion();
             $scope.health = options.services;
             var tiles = $.cookie($scope.accountName + "_dash_order");
             if (tiles === undefined || tiles.indexOf('health') > -1) {
@@ -63,6 +65,13 @@ angular.module('Dashboard', ['EucaConsoleUtils'])
                 var results = oData ? oData : {};
                 $scope.itemsLoading = false;
                 $scope.totals = results;
+                if (Modernizr.localstorage) {
+                    var saved_names = localStorage.getItem($scope.storageKey);
+                    if (saved_names) {
+                        var names = saved_names.split(',');
+                        $scope.totals.buckets = $scope.totals.buckets + names.length;
+                    }
+                }
                 $scope.setServiceStatus(results.health.name, results.health.status);
             }).error(function (oData, status) {
                 var errorMsg = oData.message || null;
@@ -104,9 +113,10 @@ angular.module('Dashboard', ['EucaConsoleUtils'])
             $scope.zoneDropdown.removeClass('open').removeAttr('style');
             $scope.getItemCounts();
         };
-        $scope.storeAWSRegion = function () {
+        $scope.storeRegion = function () {
+            var regionKey = ($scope.cloudType == 'aws')?"aws-region":"euca-region";
             if ($('#region-dropdown').length > 0 && Modernizr.localstorage) {
-                localStorage.setItem('aws-region', $('#region-dropdown').children('li[data-selected="True"]').children('a').attr('id'));
+                localStorage.setItem(regionKey, $('#region-dropdown').children('li[data-selected="True"]').children('a').attr('id'));
                 localStorage.removeItem($scope.storedZoneKey);
                 $scope.selectedZone = '';
             }
