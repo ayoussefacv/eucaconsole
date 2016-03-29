@@ -13,9 +13,9 @@ angular.module('AutoScaleTagEditor', ['ngSanitize', 'EucaConsoleUtils'])
         };
     })
     .controller('AutoScaleTagEditorCtrl', function ($scope, $sanitize, $timeout, eucaUnescapeJson) {
-        $scope.tagEditor = $('#tag-editor');
-        $scope.tagInputs = $scope.tagEditor.find('.taginput');
-        $scope.tagsTextarea = $scope.tagEditor.find('textarea#tags');
+        $scope.tagEditor = undefined;
+        $scope.tagInputs = undefined;
+        $scope.tagsTextarea = undefined;
         $scope.tagsArray = [];
         $scope.newTagKey = '';
         $scope.newTagValue = '';
@@ -30,16 +30,19 @@ angular.module('AutoScaleTagEditor', ['ngSanitize', 'EucaConsoleUtils'])
         $scope.initTags = function(optionsJson) {
             var options = JSON.parse(eucaUnescapeJson(optionsJson));
             // Parse tags JSON and convert to a list of tags.
-            var tagsArray = options['tags_list'];
+            var tagsArray = options.tags_list;
             tagsArray.forEach(function(tag) {
-                if (!tag['name'].match(/^aws:.*/) && !tag['name'].match(/^euca:.*/)) {
+                if (!tag.name.match(/^aws:.*/) && !tag.name.match(/^euca:.*/)) {
                     $scope.tagsArray.push({
-                        'name': tag['name'],
-                        'value': tag['value'],
-                        'propagate_at_launch': tag['propagate_at_launch']
+                        'name': tag.name,
+                        'value': tag.value,
+                        'propagate_at_launch': tag.propagate_at_launch
                     });
                 }
             });
+            $scope.tagEditor = $('#tag-editor');
+            $scope.tagInputs = $scope.tagEditor.find('.taginput');
+            $scope.tagsTextarea = $scope.tagEditor.find('textarea#tags');
             $scope.syncTags();
             $scope.setWatch();
         };
@@ -103,7 +106,11 @@ angular.module('AutoScaleTagEditor', ['ngSanitize', 'EucaConsoleUtils'])
                     $scope.newTagValue = '';
                 }
             } else {
-                tagKeyField.val() ? tagValueField.focus() : tagKeyField.focus();
+                if (tagKeyField.val()) {
+                    tagValueField.focus();
+                } else {
+                    tagKeyField.focus();
+                }
             }
         };
         $scope.checkRequiredInput = function () {

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2013-2014 Eucalyptus Systems, Inc.
+# Copyright 2013-2015 Hewlett Packard Enterprise Development LP
 #
 # Redistribution and use of this software in source and binary forms,
 # with or without modification, are permitted provided that the following
@@ -52,6 +52,7 @@ class AccountsView(LandingPageView):
 
     def __init__(self, request):
         super(AccountsView, self).__init__(request)
+        self.title_parts = [_(u'Accounts')]
         self.conn = self.get_connection(conn_type="iam")
         self.initial_sort_key = 'account_name'
         self.prefix = '/accounts'
@@ -61,7 +62,7 @@ class AccountsView(LandingPageView):
     def accounts_landing(self):
         json_items_endpoint = self.request.route_path('accounts_json')
         if self.request.GET:
-            json_items_endpoint += '?{params}'.format(params=urlencode(self.request.GET))
+            json_items_endpoint += u'?{params}'.format(params=urlencode(self.request.GET))
         # filter_keys are passed to client-side filtering in search box
         self.filter_keys = ['account_name', 'account_id']
         # sort_keys are passed to sorting drop-down
@@ -71,8 +72,8 @@ class AccountsView(LandingPageView):
         ]
 
         return dict(
-            filter_fields=False,
             filter_keys=self.filter_keys,
+            search_facets=BaseView.escape_json(json.dumps([])),
             sort_keys=self.sort_keys,
             prefix=self.prefix,
             initial_sort_key=self.initial_sort_key,
@@ -99,6 +100,7 @@ class AccountsView(LandingPageView):
 
 class AccountsJsonView(BaseView):
     """Accounts returned as JSON"""
+
     def __init__(self, request):
         super(AccountsJsonView, self).__init__(request)
         self.conn = self.get_connection(conn_type="iam")
@@ -111,10 +113,10 @@ class AccountsJsonView(BaseView):
             policies = []
             try:
                 policies = self.conn.get_response(
-                        'ListAccountPolicies',
-                        params={'AccountName':account.account_name}, list_marker='PolicyNames')
+                    'ListAccountPolicies',
+                    params={'AccountName': account.account_name}, list_marker='PolicyNames')
                 policies = policies.policy_names
-            except BotoServerError as exc:
+            except BotoServerError:
                 pass
             accounts.append(dict(
                 account_name=account.account_name,
@@ -127,9 +129,9 @@ class AccountsJsonView(BaseView):
     def account_summary_json(self):
         name = self.request.matchdict.get('name')
         with boto_error_handler(self.request):
-            users = self.conn.get_response('ListUsers', params={'DelegateAccount':name}, list_marker='Users')
-            groups = self.conn.get_response('ListGroups', params={'DelegateAccount':name}, list_marker='Groups')
-            roles = self.conn.get_response('ListRoles', params={'DelegateAccount':name}, list_marker='Roles')
+            users = self.conn.get_response('ListUsers', params={'DelegateAccount': name}, list_marker='Users')
+            groups = self.conn.get_response('ListGroups', params={'DelegateAccount': name}, list_marker='Groups')
+            roles = self.conn.get_response('ListRoles', params={'DelegateAccount': name}, list_marker='Roles')
             return dict(
                 results=dict(
                     account_name=name,
@@ -151,14 +153,21 @@ class AccountView(BaseView):
 
     def __init__(self, request):
         super(AccountView, self).__init__(request)
+        self.title_parts = [_(u'Account'), request.matchdict.get('name') or _(u'Create')]
         self.conn = self.get_connection(conn_type="iam")
         self.account = self.get_account()
         self.account_route_id = self.request.matchdict.get('name')
         self.account_form = AccountForm(self.request, account=self.account, formdata=self.request.params or None)
-        self.account_update_form = AccountUpdateForm(self.request, account=self.account, formdata=self.request.params or None)
+        self.account_update_form = AccountUpdateForm(self.request, account=self.account,
+                                                     formdata=self.request.params or None)
         self.delete_form = DeleteAccountForm(self.request, formdata=self.request.params)
         self.quotas_form = QuotasForm(self.request, account=self.account, conn=self.conn)
-        self.account_name_validation_error_msg = _(u"Account names must be between 3 and 63 characters long, and may contain lower case letters, numbers, \'.\'. \'@\' and \'-\', and cannot contain spaces.")
+        self.account_name_validation_error_msg = _(
+            u'''
+            Account names must be between 3 and 63 characters long, and may contain lower case
+            letters, numbers, '.', '@' and '-', and cannot contain spaces. Account names must not
+            consist of exactly 12 digits.
+            ''')
         self.render_dict = dict(
             account=self.account,
             account_route_id=self.account_route_id,
@@ -178,8 +187,8 @@ class AccountView(BaseView):
         account = None
         try:
             accounts = self.conn.get_response('ListAccounts', params={}, list_marker='Accounts').accounts
-            account = [account for account in accounts if account.account_name == account_param][0] 
-        except BotoServerError as err:
+            account = [account for account in accounts if account.account_name == account_param][0]
+        except BotoServerError:
             pass
         return account
 
@@ -192,71 +201,110 @@ class AccountView(BaseView):
         if self.account is not None:
             with boto_error_handler(self.request):
                 users = self.conn.get_response(
-                        'ListUsers',
-                        params={'DelegateAccount':self.account.account_name}, list_marker='Users')
+                    'ListUsers',
+                    params={'DelegateAccount': self.account.account_name}, list_marker='Users')
                 self.render_dict['users'] = users.list_users_response.list_users_result.users
                 groups = self.conn.get_response(
-                        'ListGroups',
-                        params={'DelegateAccount':self.account.account_name}, list_marker='Groups')
+                    'ListGroups',
+                    params={'DelegateAccount': self.account.account_name}, list_marker='Groups')
                 self.render_dict['groups'] = groups.list_groups_response.list_groups_result.groups
                 roles = self.conn.get_response(
-                        'ListRoles',
-                        params={'DelegateAccount':self.account.account_name}, list_marker='Roles')
+                    'ListRoles',
+                    params={'DelegateAccount': self.account.account_name}, list_marker='Roles')
                 self.render_dict['roles'] = roles.list_roles_response.list_roles_result.roles
         return self.render_dict
- 
+
     @view_config(route_name='account_create', request_method='POST', renderer='json')
     def account_create(self):
         if self.account_form.validate():
-            new_account_name = self.request.params.get('account_name') 
+            new_account_name = self.request.params.get('account_name')
             location = self.request.route_path('account_view', name=new_account_name)
+
+            random_password = self.request.params.get('random_password', 'n') == 'y'
+            access_keys = self.request.params.get('access_keys', 'n') == 'y'
+            users_json = self.request.params.get('users')
+
+            user_list = []
+
             with boto_error_handler(self.request, location):
-                self.log_request(_(u"Creating account {0}").format(new_account_name))
-                self.conn.get_response('CreateAccount', params={'AccountName':new_account_name})
-                admin_password = PasswordGeneration.generate_password()
-                params = {'UserName':'admin', 'Password':admin_password, 'DelegateAccount':new_account_name}
-                result = self.conn.get_response('CreateLoginProfile', params=params, verb='POST')
-                params = {'UserName':'admin', 'DelegateAccount':new_account_name}
-                creds = self.conn.get_response('CreateAccessKey', params=params, verb='POST')
-                access_id = creds.access_key.access_key_id
-                secret_key = creds.access_key.secret_access_key
+                self.log_request(_(u'Creating account {0}').format(new_account_name))
+                self.conn.get_response('CreateAccount',
+                                       params={'AccountName': new_account_name})
+
+                user = self._create_user(new_account_name, 'admin', None,
+                                         create_password=random_password,
+                                         create_access_keys=access_keys)
+                user_list.append(user)
 
                 quotas = Quotas()
                 quotas.create_quota_policy(self, account=new_account_name)
 
-                users_json = self.request.params.get('users')
-                user_list = []
                 if users_json:
                     users = json.loads(users_json)
-                    path = '/'
                     for (name, email) in users.items():
-                        self.log_request(_(u"Creating user {0}").format(name))
-                        user = self.conn.get_response('CreateUser', params={'UserName':name, 'Path':path, 'DelegateAccount':new_account_name})
-                        self.log_request(_(u"Generating password for user {0}").format(name))
-                        password = PasswordGeneration.generate_password()
-                        self.conn.get_response('CreateLoginProfile', params={'UserName':name, 'Password':password, 'DelegateAccount':new_account_name})
-                        self.log_request(_(u"Creating access keys for user {0}").format(name))
-                        creds = self.conn.get_response('CreateAccessKey', params={'UserName':name, 'DelegateAccount':new_account_name})
-                        user_list.append([new_account_name, name, password, creds.access_key.access_key_id, creds.access_key.secret_access_key])
+                        user = self._create_user(new_account_name, name, email,
+                                                 create_password=random_password,
+                                                 create_access_keys=access_keys)
+                        user_list.append(user)
 
                 # assemble file response
-                string_output = StringIO.StringIO()
-                csv_w = csv.writer(string_output)
-                header = [_(u'Account'), _(u'User Name'), _(u'Password'), _(u'Access Key'), _(u'Secret Key')]
-                csv_w.writerow(header)
-                row = [new_account_name, 'admin', admin_password, access_id, secret_key]
-                csv_w.writerow(row)
-                for user in user_list:
-                    csv_w.writerow(user)
-                self._store_file_("{acct}-users.csv".format(acct=new_account_name),
-                                  'text/csv', string_output.getvalue())
+                has_file = 'n'
+                if access_keys or random_password:
+                    string_output = StringIO.StringIO()
+                    csv_w = csv.writer(string_output)
+                    header = [_(u'Account'), _(u'User Name')]
+                    if random_password:
+                        header.append(_(u'Password'))
+                    if access_keys:
+                        header.extend([_(u'Access Key'), _(u'Secret Key')])
+                    csv_w.writerow(header)
+                    for user in user_list:
+                        row = [user['account'], user['name']]
+                        if random_password:
+                            row.append(user['password'])
+                        if access_keys:
+                            row.extend([user['access_id'], user['secret_key']])
+                        csv_w.writerow(row)
+                    self._store_file_(u"{acct}-users.csv".format(acct=new_account_name),
+                                      'text/csv', string_output.getvalue())
+                    has_file = 'y'
 
                 return dict(
                     message=_(u"Successfully created account {account}").format(account=new_account_name),
-                    results=dict(hasFile='y')
+                    results=dict(hasFile=has_file)
                 )
 
         return self.render_dict
+
+    def _create_user(self, account, name, email, path='/', create_password=True, create_access_keys=True):
+        user = {
+            'account': account,
+            'name': name
+        }
+
+        if name is not 'admin':
+            self.log_request(_(u'Creating user {0}').format(name))
+            self.conn.get_response('CreateUser',
+                                   params={'UserName': name, 'Path': path,
+                                           'DelegateAccount': account})
+
+        if create_password:
+            self.log_request(_(u'Generating password for user {0}').format(name))
+            password = PasswordGeneration.generate_password()
+            self.conn.get_response('CreateLoginProfile',
+                                       params={'UserName': name, 'Password': password,
+                                               'DelegateAccount': account})
+            user['password'] = password
+
+        if create_access_keys:
+            self.log_request(_(u'Creating access keys for user {0}').format(name))
+            creds = self.conn.get_response('CreateAccessKey',
+                                           params={'UserName': name, 'DelegateAccount': account})
+            user['access_id'] = creds.access_key.access_key_id
+            user['secret_key'] = creds.access_key.secret_access_key
+
+        return user
+
 
     @view_config(route_name='account_update', request_method='POST', renderer=TEMPLATE)
     def account_update(self):
@@ -284,7 +332,7 @@ class AccountView(BaseView):
             self.request.session.flash(msg, queue=Notification.SUCCESS)
         return HTTPFound(location=location)
 
-    def account_update_name(self, new_account_name ):
+    def account_update_name(self, new_account_name):
         this_account_name = new_account_name if new_account_name is not None else self.account.account_name
         self.conn.update_account(self.account.account_name, new_account_name=new_account_name)
         msg_template = _(u'Successfully modified account {account}')
@@ -296,7 +344,8 @@ class AccountView(BaseView):
     def account_policies_json(self):
         """Return account policies list"""
         with boto_error_handler(self.request):
-            policies = self.conn.get_response('ListAccountPolicies', params={'AccountName':self.account.account_name}, list_marker='PolicyNames')
+            policies = self.conn.get_response('ListAccountPolicies', params={'AccountName': self.account.account_name},
+                                              list_marker='PolicyNames')
             return dict(results=policies.policy_names)
 
     @view_config(route_name='account_policy_json', renderer='json', request_method='GET')
@@ -304,20 +353,23 @@ class AccountView(BaseView):
         """Return account policies list"""
         with boto_error_handler(self.request):
             policy_name = self.request.matchdict.get('policy')
-            policy = self.conn.get_response('GetAccountPolicy', params={'AccountName':self.account.account_name, 'PolicyName':policy_name}, verb='POST')
+            policy = self.conn.get_response('GetAccountPolicy', params={'AccountName': self.account.account_name,
+                                                                        'PolicyName': policy_name}, verb='POST')
             parsed = json.loads(unquote(policy.policy_document))
             return dict(results=json.dumps(parsed, indent=2))
 
     @view_config(route_name='account_update_policy', request_method='POST', renderer='json')
     def account_update_policy(self):
-        if not(self.is_csrf_valid()):
+        if not (self.is_csrf_valid()):
             return JSONResponse(status=400, message="missing CSRF token")
         # calls iam:PutAccountPolicy
         policy = self.request.matchdict.get('policy')
         with boto_error_handler(self.request):
             self.log_request(_(u"Updating policy {0} for account {1}").format(policy, self.account.account_name))
             policy_text = self.request.params.get('policy_text')
-            result = self.conn.get_response('PutAccountPolicy', params={'AccountName':self.account.account_name, 'PolicyName':policy, 'PolicyDocument':policy_text}, verb='POST')
+            result = self.conn.get_response('PutAccountPolicy',
+                                            params={'AccountName': self.account.account_name, 'PolicyName': policy,
+                                                    'PolicyDocument': policy_text}, verb='POST')
             return dict(message=_(u"Successfully updated account policy"), results=result)
 
     @view_config(route_name='account_delete_policy', request_method='POST', renderer='json')
@@ -328,6 +380,8 @@ class AccountView(BaseView):
         policy = self.request.matchdict.get('policy')
         with boto_error_handler(self.request):
             self.log_request(_(u"Deleting policy {0} for account {1}").format(policy, self.account.account_name))
-            result = self.conn.get_response('DeleteAccountPolicy', params={'AccountName':self.account.account_name, 'PolicyName':policy}, verb='POST')
+            result = self.conn.get_response('DeleteAccountPolicy',
+                                            params={'AccountName': self.account.account_name, 'PolicyName': policy},
+                                            verb='POST')
             return dict(message=_(u"Successfully deleted account policy"), results=result)
 

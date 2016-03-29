@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2013-2014 Eucalyptus Systems, Inc.
+# Copyright 2013-2015 Hewlett Packard Enterprise Development LP
 #
 # Redistribution and use of this software in source and binary forms,
 # with or without modification, are permitted provided that the following
@@ -37,22 +37,26 @@ from ..forms import ChoicesManager
 from . import BaseView
 from ..i18n import _
 from . import boto_error_handler
+from .. import utils
 
 TILE_MASTER_LIST = [
-    ('instances-running', 'Running instances'),
-    ('instances-stopped', 'Stopped instances'),
-    ('scaling-groups', 'Instances in scaling groups'),
-    ('elastic-ips', 'Elastic IPs'),
-    ('volumes', 'Volumes'),
-    ('snapshots', 'Snapshots'),
-    ('buckets', 'Buckets (S3)'),
-    ('security-groups', 'Security groups'),
-    ('key-pairs', 'Key pairs'),
-    ('accounts', 'Accounts'),
-    ('users', 'Users'),
-    ('groups', 'Groups'),
-    ('roles', 'Roles'),
-    ('health', 'Service status')
+    ('instances-running', _(u'Running instances')),
+    ('instances-stopped', _(u'Stopped instances')),
+    ('stacks', _(u'Stacks')),
+    ('alarms', _(u'CloudWatch alarms')),
+    ('scaling-groups', _(u'Instances in scaling groups')),
+    ('elastic-ips', _(u'Elastic IPs')),
+    ('security-groups', _(u'Security groups')),
+    ('key-pairs', _(u'Key pairs')),
+    ('load-balancers', _(u'Load balancers')),
+    ('health', _(u'Service status')),
+    ('volumes', _(u'Volumes')),
+    ('snapshots', _(u'Snapshots')),
+    ('buckets', _(u'Buckets (S3)')),
+    ('accounts', _(u'Accounts')),
+    ('users', _(u'Users')),
+    ('groups', _(u'Groups')),
+    ('roles', _(u'Roles'))
 ]
 
 
@@ -60,17 +64,16 @@ class DashboardView(BaseView):
 
     def __init__(self, request):
         super(DashboardView, self).__init__(request)
-        self.request = request
+        self.title_parts = [_(u'Dashboard')]
         self.conn = self.get_connection()
 
     @view_config(route_name='dashboard', request_method='GET', renderer='../templates/dashboard.pt')
     def dashboard_home(self):
-        availability_zones = []
         with boto_error_handler(self.request):
-            region = self.request.session.get('region')
-            availability_zones = ChoicesManager(self.conn).get_availability_zones(region)
-        tiles = self.request.cookies.get("{0}_dash_order".format(
-            self.request.session['account' if self.request.session['cloud_type'] == 'euca' else 'access_id']))
+            availability_zones = ChoicesManager(self.conn).get_availability_zones(self.region)
+            alarms_triggered = self.get_connection(conn_type='cloudwatch').describe_alarms(state_value="ALARM")
+        tiles = self.request.cookies.get(u"{0}_dash_order".format(
+            self.request.session['account' if self.cloud_type == 'euca' else 'access_id']))
         if tiles is not None:
             tiles = tiles.replace('%2C', ',')
         else:
@@ -109,32 +112,36 @@ class DashboardView(BaseView):
                     pass
 
         tiles_are_default = (tiles == ','.join(tiles_default))
-
         return dict(
             availability_zones=availability_zones,
             tiles=tiles.split(','),
             tiles_not_shown=[(tile, label) for (tile, label) in TILE_MASTER_LIST if tile in tiles_not_shown],
             tiles_are_default=tiles_are_default,
             controller_options_json=self.get_controller_options_json(),
+            ufshost_error=utils.is_ufshost_error(self.conn, self.cloud_type),
+            alarms_triggered=len(alarms_triggered)
         )
 
     def get_controller_options_json(self):
-        services=[
+        services = [
             dict(name=_(u'Compute'), status=''),
             dict(name=_(u'Object Storage'), status=''),
             dict(name=_(u'Auto Scaling'), status=''),
             dict(name=_(u'Elastic Load Balancing'), status=''),
             dict(name=_(u'CloudWatch'), status=''),
+            dict(name=_(u'CloudFormation'), status=''),
         ]
         session = self.request.session
         if session['cloud_type'] == 'euca':
             services.append(dict(name=_(u'Identity & Access Mgmt'), status=''))
+        storage_key = self.get_shared_buckets_storage_key(self.conn.host)
         return BaseView.escape_json(json.dumps({
             'json_items_url': self.request.route_path('dashboard_json'),
             'services': services,
             'service_status_url': self.request.route_path('service_status_json'),
             'cloud_type': self.cloud_type,
             'account_display_name': self.get_account_display_name(),
+            'storage_key': storage_key
         }))
 
 
@@ -142,6 +149,7 @@ class DashboardJsonView(BaseView):
     @view_config(route_name='dashboard_json', request_method='GET', renderer='json')
     def dashboard_json(self):
         ec2_conn = self.get_connection()
+        elb_conn = self.get_connection(conn_type='elb')
 
         # Fetch availability zone if set
         zone = self.request.params.get('zone')
@@ -153,15 +161,15 @@ class DashboardJsonView(BaseView):
         instances_total_count = instances_running_count = instances_stopped_count = instances_scaling_count = 0
 
         # Get list of tiles so we can fetch only data for tiles the user is showing
-        tiles = self.request.cookies.get("{0}_dash_order".format(
-            self.request.session['account' if self.request.session['cloud_type'] == 'euca' else 'access_id']))
+        tiles = self.request.cookies.get(u"{0}_dash_order".format(
+            self.request.session['account' if self.cloud_type == 'euca' else 'access_id']))
         if tiles is None:
             tiles = ','.join([tile for (tile, label) in TILE_MASTER_LIST])
         with boto_error_handler(self.request):
             if ('instances-running' or 'instances-stopped' or 'scaling-groups') in tiles:
                 for instance in ec2_conn.get_only_instances(filters=filters):
                     instances_total_count += 1
-                    if instance.tags.get('aws:autoscaling:groupName'):
+                    if instance.tags.get('aws:autoscaling:groupName') and instance.state == u'running':
                         instances_scaling_count += 1
                     if instance.state == u'running':
                         instances_running_count += 1
@@ -182,8 +190,9 @@ class DashboardJsonView(BaseView):
             securitygroups_count = len(ec2_conn.get_all_security_groups()) if 'security-groups' in tiles else 0
             keypairs_count = len(ec2_conn.get_all_key_pairs()) if 'key-pairs' in tiles else 0
             elasticips_count = len(ec2_conn.get_all_addresses()) if 'elastic-ips' in tiles else 0
+            loadbalancers_count = len(elb_conn.get_all_load_balancers()) if 'load-balancers' in tiles else 0
 
-            #TODO: catch errors in this block and turn iam health off
+            # TODO: catch errors in this block and turn iam health off
             # IAM counts
             accounts_count = 0
             users_count = 0
@@ -202,22 +211,31 @@ class DashboardJsonView(BaseView):
                 if session['role_access']:
                     roles_count = len(iam_conn.list_roles().roles) if 'roles' in tiles else 0
 
+            stacks_count = 0
+            try:
+                cf_conn = self.get_connection(conn_type="cloudformation")
+                stacks_count = len(cf_conn.describe_stacks()) if 'stacks' in tiles else 0
+            except BotoServerError:
+                pass
+
             return dict(
                 instance_total=instances_total_count,
                 instances_running=instances_running_count,
                 instances_stopped=instances_stopped_count,
                 instances_scaling=instances_scaling_count,
+                stacks=stacks_count,
                 volumes=volumes_count,
                 snapshots=snapshots_count,
                 buckets=buckets_count,
                 securitygroups=securitygroups_count,
                 keypairs=keypairs_count,
+                loadbalancers=loadbalancers_count,
                 eips=elasticips_count,
                 accounts=accounts_count,
                 users=users_count,
                 groups=groups_count,
                 roles=roles_count,
-                health = dict(name=_(u'Compute'), status='up'),  # this determined client-side
+                health=dict(name=_(u'Compute'), status='up'),  # this determined client-side
             )
 
     @view_config(route_name='service_status_json', request_method='GET', renderer='json')
@@ -265,6 +283,16 @@ class DashboardJsonView(BaseView):
                 conn = self.get_connection(conn_type="iam")
                 try:
                     conn.get_all_groups(path_prefix="/notlikely")
+                except BotoServerError as err:
+                    if err.code == 'UnauthorizedOperation':
+                        status = 'denied'
+                    else:
+                        status = 'down'
+            elif svc == _(u'CloudFoundations'):
+                conn = self.get_connection(conn_type="cloudfoundation")
+                try:
+                    # we don't support update, and it's transient, so not likely to return data
+                    conn.list_stacks(stack_status_filters=['UPDATE_IN_PROGRESS'])
                 except BotoServerError as err:
                     if err.code == 'UnauthorizedOperation':
                         status = 'denied'

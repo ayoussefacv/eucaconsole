@@ -5,8 +5,12 @@
       xmlns:i18n="http://xml.zope.org/namespaces/i18n"
       i18n:domain="eucaconsole" ng-csp="">
 <head>
-    <title i18n:translate="">Eucalyptus Management Console</title>
+    <title tal:define="title_parts getattr(view, 'title_parts', [])">
+        <span tal:omit-tag="" tal:repeat="part reversed(title_parts)">${part} |</span>
+        <span tal:omit-tag="" i18n:translate="">Eucalyptus Management Console</span>
+    </title>
     <meta http-equiv="Content-Type" content="text/html;charset=UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width" />
     <link rel="shortcut icon" href="${request.static_path('eucaconsole:static/img/favicon.ico')}" />
     <link rel="stylesheet" href="${request.static_path('eucaconsole:static/css/thirdparty/angular-csp.css')}"
@@ -16,25 +20,36 @@
     <link rel="stylesheet" type="text/css" href="${request.static_path('eucaconsole:static/css/thirdparty/chosen.min.css')}" />
     <link rel="stylesheet" href="${request.static_path('eucaconsole:static/css/eucaconsole.css')}"
           type="text/css" media="screen" charset="utf-8" />
+    <link rel="stylesheet" href="${request.static_path('eucaconsole:static/css/euca-font-awesome.css')}"
+          type="text/css" media="screen" charset="utf-8" />
     <metal:block metal:define-slot="head_css" />
     <script src="${request.static_path('eucaconsole:static/js/thirdparty/modernizr/custom.modernizr.js')}"></script>
     <script src="${request.static_path('eucaconsole:static/js/thirdparty/jquery/jquery.min.js')}"></script>
-    <script src="${request.static_path('eucaconsole:static/js/thirdparty/angular/angular.min.js')}"></script>
+    <script src="${request.static_path('eucaconsole:static/js/thirdparty/angular/angular.js')}"></script>
     <script src="${request.static_path('eucaconsole:static/js/thirdparty/angular/angular-sanitize.min.js')}"></script>
     <script src="${request.static_path('eucaconsole:static/js/thirdparty/jquery/jquery.generateFile.js')}"></script>
     <script src="${request.static_path('eucaconsole:static/js/widgets/notify.js')}"></script>
+    <script src="${request.static_path('eucaconsole:static/js/pages/custom_filters.js')}"></script>
     <script src="${request.static_path('eucaconsole:static/js/pages/eucaconsole_utils.js')}"></script>
     <metal:block metal:define-slot="head_js" />
 </head>
 
 <body>
-<div class="off-canvas-wrap">
+<div class="off-canvas-wrap" data-offcanvas="">
+<div class="left-nav nav-collapsed">
+    ${panel('top_nav', off_canvas=False)}
+</div>
 <div id="canvaswrap" class="inner-wrap">
     <div id="logobar-wrapper">
         <nav id="logobar" class="row" metal:define-slot="logobar">
             <a class="left-off-canvas-toggle" id="offcanvas-icon"
-               tal:condition="request.user.is_authenticated()"><i class="fi-list"></i></a>
-            <a id="logo" href="${layout.home_url}" title="${layout.site_title}"></a>
+               tal:condition="request.user.is_authenticated()">
+               <i class="fi-list"></i>
+               <span id="hp-logo"></span>
+            </a>
+            <a href="/" title="${layout.site_title}" metal:define-slot="logo">
+                <span class="product-name">Eucalyptus</span>
+            </a>
             <section tal:condition="request.user.is_authenticated()" id="user-dropdown-section">
                 <a href="#" data-dropdown="user-dropdown" class="small secondary dropdown">
                     <span class="${layout.cloud_type} username-label">${layout.username_label}</span>
@@ -51,13 +66,13 @@
                     <li><a href="#" id="logout" i18n:translate="">Log out</a></li>
                 </ul>
             </section>
-            <section tal:condition="request.user.is_authenticated() and layout.cloud_type == 'aws'">
-                <a id="selected-region" data-dropdown="region-dropdown" class="small secondary dropdown">
+            <section tal:condition="request.user.is_authenticated() and layout.has_regions == True">
+                <a id="selected-region" data-dropdown="region-dropdown" class="small secondary dropdown ${layout.cloud_type}">
                     <span>${layout.selected_region_label}</span>
                     <span class="down-caret"></span>
                 </a>
                 <ul id="region-dropdown" class="f-dropdown" data-dropdown-content="">
-                    <li tal:repeat="region layout.aws_regions" tal:attributes="data-selected (region.name == layout.selected_region)">
+                    <li tal:repeat="region layout.regions" tal:attributes="data-selected (region.name == layout.selected_region)">
                         <a href="${request.route_path('region_select')}?region=${region.name}&amp;returnto=${request.path}"
                            class="aws-region-option" id="${region.name}">
                                ${region.label}
@@ -68,26 +83,9 @@
         </nav>
     </div>
 
-    <!-- Top nav bar -->
-    <div id="navbar" tal:condition="request.user.is_authenticated()">
-        <nav class="row top-bar" data-topbar="" data-options="is_hover:false">
-            <ul class="title-area">
-                <li class="name"></li>
-                <li class="toggle-topbar menu-icon"><a href="#"><span></span></a></li>
-            </ul>
-            <section class="top-bar-section">
-                ${panel('top_nav')}
-            </section>
-        </nav>
-    </div>
     <!-- Off Canvas Menu: Left -->
     <div class="left-off-canvas-menu">
         ${panel('top_nav', off_canvas=True)}
-    </div>
-
-    <!-- Off Canvas Menu: Right-->
-    <div class="right-off-canvas-menu">
-        <metal:block metal:define-slot="offcanvas_right" />
     </div>
 
     <!-- Main Content -->
@@ -99,9 +97,12 @@
     <!-- Footer -->
     <footer>
         <div class="row">
-           <div class="copyright subheader">
-               © 2014 Eucalyptus Systems, Inc.
-           </div>
+            <div id="hpe-logo"></div>
+        </div>
+        <div class="row">
+           <span>HPE Helion Eucalyptus</span><span class="copyright subheader">
+            &nbsp;| © 2015-2016 Hewlett Packard Enterprise Company, L.P.
+           </span>
         </div>
         <form id="euca-logout-form" method="post" action="${request.route_path('logout')}">
             ${structure:layout.euca_logout_form['csrf_token']}

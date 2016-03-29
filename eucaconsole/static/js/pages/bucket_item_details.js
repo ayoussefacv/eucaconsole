@@ -6,26 +6,41 @@
 
 /* Bucket item details page includes the S3 Sharing Panel and Metadata Editor */
 angular.module('BucketItemDetailsPage', ['S3SharingPanel', 'S3MetadataEditor', 'EucaConsoleUtils'])
-    .controller('BucketItemDetailsPageCtrl', function ($scope, $http, eucaUnescapeJson, eucaHandleErrorS3) {
+    .controller('BucketItemDetailsPageCtrl', function ($scope, $http, $timeout, eucaUnescapeJson, eucaHandleErrorS3) {
         $http.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
         $scope.bucketItemDetailsForm = $('#bucket-item-details-form');
         $scope.isSubmitted = false;
         $scope.hasChangesToBeSaved = false;
         $scope.objectName = '';
+        $scope.expiration = '3600';
+        $scope.sharedLink = '';
+        $scope.sharedLinkGenerating = false;
         $scope.initController = function (optionsJson) {
             var options = JSON.parse(eucaUnescapeJson(optionsJson));
-            $scope.deleteUrl = options['delete_keys_url'];
-            $scope.bucketUrl = options['bucket_url'];
-            $scope.bucketItemKey = options['bucket_item_key'];
-            $scope.unprefixedKey = options['unprefixed_key'];
-            $scope.makeObjectPublicUrl = options['make_object_public_url'];
+            $scope.deleteUrl = options.delete_keys_url;
+            $scope.bucketUrl = options.bucket_url;
+            $scope.bucketItemKey = options.bucket_item_key;
+            $scope.unprefixedKey = options.unprefixed_key;
+            $scope.makeObjectPublicUrl = options.make_object_public_url;
+            $scope.generateSharedLinkEndpoint = options.bucket_item_generate_url_endpoint;
             $scope.setInitialValues();
+            $scope.setWatchers();
             $scope.handleUnsavedChanges();
             $scope.handleUnsavedSharingEntry($scope.bucketItemDetailsForm);
             $scope.handleUnsavedMetadataEntry($scope.bucketItemDetailsForm);
         };
         $scope.setInitialValues = function () {
             $scope.objectName = $('#friendly_name').val();
+        };
+        $scope.setWatchers = function () {
+            $('#shared-link-textarea').on('click', function () {
+                $(this).select();
+            });
+            $scope.$watch('expiration', function (newVal, oldVal) {
+                if (newVal !== oldVal) {
+                    $scope.sharedLink = '';  // Empty link when selecting new expiration timestamp
+                }
+            });
         };
         $scope.handleUnsavedChanges = function () {
             // Listen for sharing panel update
@@ -37,7 +52,7 @@ angular.module('BucketItemDetailsPage', ['S3SharingPanel', 'S3MetadataEditor', '
                 $scope.hasChangesToBeSaved = true;
             });
             $scope.$watch('objectName', function (newVal, oldVal) {
-                if (newVal != oldVal) {
+                if (newVal !== oldVal) {
                     $scope.hasChangesToBeSaved = true;
                 }
             });
@@ -56,7 +71,7 @@ angular.module('BucketItemDetailsPage', ['S3SharingPanel', 'S3MetadataEditor', '
             // Display warning when there's an unsaved Sharing Panel entry
             form.on('submit', function (event) {
                 var accountInputField = form.find('#share_account:visible');
-                if (accountInputField.length && accountInputField.val() != '') {
+                if (accountInputField.length && accountInputField.val() !== '') {
                     event.preventDefault();
                     $scope.isSubmitted = false;
                     $('#unsaved-sharing-warning-modal').foundation('reveal', 'open');
@@ -68,7 +83,7 @@ angular.module('BucketItemDetailsPage', ['S3SharingPanel', 'S3MetadataEditor', '
             // Display warning when there's an unsaved Metadata Pair entry
             form.on('submit', function (event) {
                 var metadataKeyInputField = form.find('#metadata_key');
-                if (metadataKeyInputField.length && metadataKeyInputField.val() != '') {
+                if (metadataKeyInputField.length && metadataKeyInputField.val() !== '') {
                     event.preventDefault();
                     $scope.isSubmitted = false;
                     $('#unsaved-metadata-warning-modal').foundation('reveal', 'open');
@@ -78,7 +93,9 @@ angular.module('BucketItemDetailsPage', ['S3SharingPanel', 'S3MetadataEditor', '
         };
         $scope.saveKey = function (bucket_name, bucket_item) {
             $('.actions-menu').trigger('click');
-            Modernizr.sessionstorage && sessionStorage.setItem('copy-object-buffer', bucket_name + '/' + bucket_item);
+            if (Modernizr.sessionstorage) {
+                sessionStorage.setItem('copy-object-buffer', bucket_name + '/' + bucket_item);
+            }
         };
         $scope.confirmDelete = function (name) {
             $('.actions-menu').trigger('click');
@@ -97,7 +114,7 @@ angular.module('BucketItemDetailsPage', ['S3SharingPanel', 'S3MetadataEditor', '
                     window.location = $scope.bucketUrl;
                 }).
                 error(function (oData, status) {
-                    var errorMsg = oData['message'] || '';
+                    var errorMsg = oData.message || '';
                     if (errorMsg && status === 403) {
                         $('#timed-out-modal').foundation('reveal', 'open');
                     }
@@ -124,6 +141,22 @@ angular.module('BucketItemDetailsPage', ['S3SharingPanel', 'S3MetadataEditor', '
                 }).
                 error(function (oData, status) {
                     eucaHandleErrorS3(oData, status);
+                });
+        };
+        $scope.generateSharedLink = function () {
+            $scope.sharedLinkGenerating = true;
+            var data = "csrf_token=" + $('#csrf_token').val() + "&expiration=" + $scope.expiration;
+            $http({method: 'POST', url: $scope.generateSharedLinkEndpoint, data: data}).
+                success(function (oData) {
+                    $scope.sharedLink = oData.shared_link;
+                    $scope.sharedLinkGenerating = false;
+                    $timeout(function() {
+                        $('#shared-link-textarea').click();
+                    }, 100);
+                }).
+                error(function (oData, status) {
+                    eucaHandleErrorS3(oData, status);
+                    $scope.sharedLinkGenerating = false;
                 });
         };
     })

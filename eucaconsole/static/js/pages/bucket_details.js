@@ -18,15 +18,15 @@ angular.module('BucketDetailsPage', ['S3SharingPanel', 'EucaConsoleUtils'])
             $scope.handleUnsavedChanges();
             $scope.handleUnsavedSharingEntry($scope.bucketDetailsForm);
             // set upload button target based on media query
-            if (window.matchMedia(Foundation.media_queries['small']).matches === false) {
-                $('#upload-file-action').attr('target', '_blank');
+            if (Foundation.utils.is_medium_up()) {
+                $('#upload-file-action').attr('target', 'upload-file');
             }
         };
         $scope.getBucketObjectsCount = function () {
             $http.get($scope.bucketObjectsCountUrl).success(function(oData) {
                 var results = oData ? oData.results : {};
-                $scope.bucketCount = results['object_count'];
-                $scope.versionCount = results['version_count'];
+                $scope.bucketCount = results.object_count;
+                $scope.versionCount = results.version_count;
                 $scope.objectsCountLoading = false;
             }).error(function (oData, status) {
                 eucaHandleErrorS3(oData, status);
@@ -47,7 +47,7 @@ angular.module('BucketDetailsPage', ['S3SharingPanel', 'EucaConsoleUtils'])
                 $scope.hasChangesToBeSaved = true;
             });
             $scope.$watch('objectName', function (newVal, oldVal) {
-                if (newVal != oldVal) {
+                if (newVal !== oldVal) {
                     $scope.hasChangesToBeSaved = true;
                 }
             });
@@ -72,7 +72,7 @@ angular.module('BucketDetailsPage', ['S3SharingPanel', 'EucaConsoleUtils'])
             // Display warning when there's an unsaved Sharing Panel entry
             form.on('submit', function (event) {
                 var accountInputField = form.find('#share_account:visible');
-                if (accountInputField.length && accountInputField.val() != '') {
+                if (accountInputField.length && accountInputField.val() !== '') {
                     event.preventDefault();
                     $scope.isSubmitted = false;
                     $('#unsaved-sharing-warning-modal').foundation('reveal', 'open');
@@ -82,7 +82,7 @@ angular.module('BucketDetailsPage', ['S3SharingPanel', 'EucaConsoleUtils'])
         };
         // Receive postMessage from file upload window, refreshing list when file upload completes
         window.addEventListener('message', function (event) {
-            if (event.data == 's3:fileUploaded') {
+            if (event.data === 's3:fileUploaded') {
                 $scope.getBucketObjectsCount();
             }
         }, false);

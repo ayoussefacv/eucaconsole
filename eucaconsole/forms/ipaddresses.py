@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2013-2014 Eucalyptus Systems, Inc.
+# Copyright 2013-2015 Hewlett Packard Enterprise Development LP
 #
 # Redistribution and use of this software in source and binary forms,
 # with or without modification, are permitted provided that the following
@@ -87,17 +87,20 @@ class IPAddressesFiltersForm(BaseSecureForm):
         self.request = request
         self.assignment.choices = self.get_assignment_choices()
         self.domain.choices = self.get_domain_choices()
+        self.facets = [
+            {'name': 'assignment', 'label': self.assignment.label.text, 'options': self.get_assignment_choices()},
+        ]
 
     @staticmethod
     def get_assignment_choices():
-        return (
-            ('assigned', 'Assigned'),
-            ('', 'Unassigned'),
-        )
+        return [
+            {'key': 'assigned', 'label': _(u'Assigned')},
+            {'key': '', 'label': _(u'Unassigned')},
+        ]
 
     @staticmethod
     def get_domain_choices():
-        return (
-            ('standard', 'Standard'),
-            ('vpc', 'VPC'),
-        )
+        return [
+            {'key': 'standard', 'label': _(u'Standard')},
+            {'key': 'vpc', 'label': _(u'VPC')},
+        ]

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2013-2014 Eucalyptus Systems, Inc.
+# Copyright 2013-2015 Hewlett Packard Enterprise Development LP
 #
 # Redistribution and use of this software in source and binary forms,
 # with or without modification, are permitted provided that the following
@@ -50,18 +50,15 @@ class ManageCredentialsView(BaseView, PermissionCheckMixin):
 
     def __init__(self, request):
         super(ManageCredentialsView, self).__init__(request)
+        self.title_parts = [_(u'Manage Credentials')]
         self.changepassword_form = EucaChangePasswordForm(self.request)
-        referrer = urlparse(self.request.url).path
+        referrer = urlparse(self.request.headers['REFERER']).path
         referrer_root = referrer.split('?')[0]
         changepassword_url = self.request.route_path('changepassword')
         if referrer_root in [changepassword_url]:
             referrer = '/'  # never use the changepassword form itself as came_from
         self.came_from = self.sanitize_url(self.request.params.get('came_from', referrer))
         self.changepassword_form_errors = []
-
-    @view_config(route_name='managecredentials', request_method='GET',
-                 renderer=template, permission=NO_PERMISSION_REQUIRED)
-    def manage_credentials(self):
         session = self.request.session
         try:
             account = session['account']
@@ -72,7 +69,7 @@ class ManageCredentialsView(BaseView, PermissionCheckMixin):
         if account is None:  # session expired, redirect
             raise HTTPFound(location=self.request.route_path('login'))
         account_id = User.get_account_id(ec2_conn=self.get_connection(), request=self.request)
-        return dict(
+        self.render_dict = dict(
             changepassword_form=self.changepassword_form,
             changepassword_form_errors=self.changepassword_form_errors,
             password_expired=True if self.request.params.get('expired') == 'true' else False,
@@ -82,20 +79,30 @@ class ManageCredentialsView(BaseView, PermissionCheckMixin):
             account_id=account_id
         )
 
+    @view_config(route_name='managecredentials', request_method='GET',
+                 renderer=template, permission=NO_PERMISSION_REQUIRED)
+    def manage_credentials(self):
+        return self.render_dict
+
     @view_config(route_name='changepassword', request_method='POST',
                  renderer=template, permission=NO_PERMISSION_REQUIRED)
     def handle_changepassword(self):
         """Handle login form post"""
         session = self.request.session
         duration = self.request.registry.settings.get('session.cookie_expires')
-        account = "huh?"
-        username = "what?"
+        account = self.request.params.get('account')
+        username = self.request.params.get('username')
         auth = self.get_euca_authenticator()
         changepassword_form = EucaChangePasswordForm(self.request, formdata=self.request.params)
+        location = "{0}?{1}&{2}&{3}&{4}".format(
+            self.request.route_path('managecredentials'),
+            'expired=' + self.request.params.get('expired'),
+            'came_from=' + self.came_from,
+            'account=' + account,
+            'username=' + username,
+        )
 
         if changepassword_form.validate():
-            account = self.request.params.get('account')
-            username = self.request.params.get('username')
             password = self.request.params.get('current_password')
             new_password = self.request.params.get('new_password')
             new_password2 = self.request.params.get('new_password2')
@@ -103,10 +110,11 @@ class ManageCredentialsView(BaseView, PermissionCheckMixin):
                 self.changepassword_form_errors.append(u'New passwords must match.')
             else:
                 try:
-                    creds = auth.authenticate(account=account, user=username,
-                                passwd=password, new_passwd=new_password, timeout=8, duration=duration)
+                    creds = auth.authenticate(
+                        account=account, user=username,
+                        passwd=password, new_passwd=new_password, timeout=8, duration=duration)
                     # logging.debug("auth creds = "+str(creds.__dict__))
-                    user_account = '{user}@{account}'.format(user=username, account=account)
+                    user_account = u'{user}@{account}'.format(user=username, account=account)
                     session['cloud_type'] = 'euca'
                     session['account'] = account
                     session['username'] = username
@@ -117,26 +125,28 @@ class ManageCredentialsView(BaseView, PermissionCheckMixin):
                     session['username'] = username
                     session['region'] = 'euca'
                     session['username_label'] = user_account
-                    self.check_iam_perms(session, creds);
+                    session['dns_enabled'] = auth.dns_enabled  # this *must* be prior to line below
+                    self.check_iam_perms(session, creds)
                     headers = remember(self.request, user_account)
                     msg = _(u'Successfully changed password.')
                     self.request.session.flash(msg, queue=Notification.SUCCESS)
                     return HTTPFound(location=self.came_from, headers=headers)
                 except HTTPError, err:
                     # the logging here and below is really very useful when debugging login problems.
-                    logging.info("http error "+str(vars(err)))
+                    logging.info("http error " + str(vars(err)))
                     if err.msg == u'Unauthorized':
-                        self.changepassword_form_errors.append(u'Invalid user/account name and/or password.')
+                        msg = _(u'Invalid user/account name and/or password.')
+                        self.request.session.flash(msg, queue=Notification.ERROR)
+                    return self.render_dict
                 except URLError, err:
-                    logging.info("url error "+str(vars(err)))
+                    logging.info("url error " + str(vars(err)))
                     if str(err.reason) == 'timed out':
-                        clchost = self.request.registry.settings.get('clchost')
-                        self.changepassword_form_errors.append(u'No response from host ' + clchost)
-        return dict(
-            changepassword_form=changepassword_form,
-            changepassword_form_errors=self.changepassword_form_errors,
-            password_expired=True if self.request.params.get('expired') == 'true' else False,
-            came_from=self.came_from,
-            account=account,
-            username=username
-        )
+                        host = self._get_ufs_host_setting_()
+                        msg = _(u'No response from host ') + host
+                        self.request.session.flash(msg, queue=Notification.ERROR)
+                    return self.render_dict
+        else:
+            self.request.error_messages = changepassword_form.get_errors_list()
+            return self.render_dict
+
+        return HTTPFound(location=location)

@@ -24,7 +24,7 @@ describe("InstancesPage", function() {
         var template = window.__html__['templates/instances/instances.pt'];
         // remove <script src> and <link> tags to avoid phantomJS error
         template = template.replace(/script src/g, "script ignore_src"); 
-        template = template.replace(/\<link/g, "\<ignore_link"); 
+        template = template.replace(/<link/g, "<ignore_link"); 
         setFixtures(template);
     });
 
@@ -43,7 +43,7 @@ describe("InstancesPage", function() {
 
         it("Should call initChosenSelectors() when initController() is called", function() {
             spyOn(scope, 'initChosenSelectors');
-            scope.initController();
+            scope.initController('{}');
             expect(scope.initChosenSelectors).toHaveBeenCalled();
         });
     });

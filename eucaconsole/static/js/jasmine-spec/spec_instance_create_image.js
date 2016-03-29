@@ -24,7 +24,7 @@ describe("InstanceCreateImage", function() {
         var template = window.__html__['templates/instances/instance_create_image.pt'];
         // remove <script src> and <link> tags to avoid phantomJS error
         template = template.replace(/script src/g, "script ignore_src"); 
-        template = template.replace(/\<link/g, "\<ignore_link"); 
+        template = template.replace(/<link/g, "<ignore_link"); 
         setFixtures(template);
     });
 
@@ -38,8 +38,8 @@ describe("InstanceCreateImage", function() {
             expect(scope.name).toEqual('');
         });
 
-        it("Initial value of s3_bucket is empty", function() {
-            expect(scope.s3_bucket).toEqual('');
+        it("Initial value of bucketName is empty", function() {
+            expect(scope.bucketName).toEqual('');
         });
 
         it("Initial value of s3_prefix is image", function() {
@@ -79,8 +79,8 @@ describe("InstanceCreateImage", function() {
             expect(scope.isNotValid).toBeTruthy();
         });
 
-        it("Should invalid input if s3_bucket is empty", function() {
-            scope.s3_bucket = '';
+        it("Should invalid input if bucketName is empty", function() {
+            scope.bucketName = '';
             scope.checkRequiredInput();
             expect(scope.isNotValid).toBeTruthy();
         });

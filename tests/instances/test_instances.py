@@ -1,4 +1,4 @@
-# Copyright 2013-2014 Eucalyptus Systems, Inc.
+# Copyright 2013-2015 Hewlett Packard Enterprise Development LP
 #
 # Redistribution and use of this software in source and binary forms,
 # with or without modification, are permitted provided that the following
@@ -29,9 +29,14 @@ Instances tests
 See http://docs.pylonsproject.org/projects/pyramid/en/latest/narr/testing.html
 
 """
+import boto
+
+from moto import mock_ec2
+
 from pyramid import testing
 from pyramid.httpexceptions import HTTPNotFound
 
+from eucaconsole.constants.instances import AWS_INSTANCE_TYPE_CHOICES
 from eucaconsole.forms import BaseSecureForm
 from eucaconsole.forms.instances import (
     StartInstanceForm, StopInstanceForm, RebootInstanceForm, TerminateInstanceForm,
@@ -40,9 +45,20 @@ from eucaconsole.forms.instances import (
 )
 from eucaconsole.i18n import _
 from eucaconsole.views import TaggedItemView
-from eucaconsole.views.instances import InstancesView, InstanceView
+from eucaconsole.views.instances import InstancesView, InstancesJsonView, InstanceView, InstanceMonitoringView
 
 from tests import BaseViewTestCase, BaseFormTestCase, Mock
+
+
+class MockInstanceMixin(object):
+    @staticmethod
+    @mock_ec2
+    def make_instance(image_id=None, **kwargs):
+        ec2_conn = boto.connect_ec2('us-east')
+        if image_id is None:
+            image_id = 'ami-1234abcd'
+        reservation = ec2_conn.run_instances(image_id, **kwargs)
+        return reservation.instances[0]
 
 
 class InstancesViewTests(BaseViewTestCase):
@@ -59,6 +75,20 @@ class InstancesViewTests(BaseViewTestCase):
         request.session['role_access'] = True
         view = InstancesView(request).instances_landing()
         self.assertTrue('/instances/json' in view.get('json_items_endpoint'))
+
+
+class InstancesSortableIPTestCase(BaseViewTestCase):
+    ips = [
+        '10.0.200.0',
+        '10.0.199.200',
+    ]
+
+    def test_sortable_ips(self):
+        request = testing.DummyRequest()
+        view = InstancesJsonView(request)
+        get_sortable_ip = view.get_sortable_ip
+        sorted_ips = sorted([get_sortable_ip(ip) for ip in self.ips])
+        self.assertEqual(sorted_ips[0], get_sortable_ip(self.ips[1]))
 
 
 class InstanceViewTests(BaseViewTestCase):
@@ -155,13 +185,15 @@ class AttachVolumeDeviceEucalyptusTestCase(BaseFormTestCase):
     def test_initial_attach_device_on_eucalyptus(self):
         instance = Mock()
         instance.block_device_mapping = {}
-        device = self.form_class.suggest_next_device_name(self.request, instance)
+        cloud_type = self.request.session.get('cloud_type')
+        device = self.form_class.suggest_next_device_name(cloud_type, instance.block_device_mapping)
         self.assertEqual(device, '/dev/vdc')
 
     def test_next_attach_device_on_eucalyptus(self):
         instance = Mock()
         instance.block_device_mapping = {'/dev/vdc': 'foo'}
-        device = self.form_class.suggest_next_device_name(self.request, instance)
+        cloud_type = self.request.session.get('cloud_type')
+        device = self.form_class.suggest_next_device_name(cloud_type, instance.block_device_mapping)
         self.assertEqual(device, '/dev/vdd')
 
 
@@ -176,13 +208,15 @@ class AttachVolumeDeviceAWSTestCase(BaseFormTestCase):
     def test_initial_attach_device_on_aws(self):
         instance = Mock()
         instance.block_device_mapping = {}
-        device = self.form_class.suggest_next_device_name(self.request, instance)
+        cloud_type = self.request.session.get('cloud_type')
+        device = self.form_class.suggest_next_device_name(cloud_type, instance.block_device_mapping)
         self.assertEqual(device, '/dev/sdf')
 
     def test_next_attach_device_on_aws(self):
         instance = Mock()
         instance.block_device_mapping = {'/dev/sdf': 'foo'}
-        device = self.form_class.suggest_next_device_name(self.request, instance)
+        cloud_type = self.request.session.get('cloud_type')
+        device = self.form_class.suggest_next_device_name(cloud_type, instance.block_device_mapping)
         self.assertEqual(device, '/dev/sdg')
 
 
@@ -215,8 +249,12 @@ class InstanceLaunchFormTestCase(BaseFormTestCase):
         self.assert_required('securitygroup')
 
 
-class InstanceCreateImageFormTestCase(BaseFormTestCase):
+class InstanceCreateImageFormTestCase(BaseFormTestCase, BaseViewTestCase):
     form_class = InstanceCreateImageForm
+    request = testing.DummyRequest()
+    request.session.update({
+        'region': 'euca',
+    })
 
     def setUp(self):
         self.form = self.form_class(self.request)
@@ -277,3 +315,46 @@ class InstancesFiltersFormTestCaseOnAWS(BaseFormTestCase):
 
     def test_instances_filters_form_vpc_id_choices_on_aws(self):
         self.assertTrue(('None', _(u'No VPC')) in self.form.vpc_id.choices)
+
+
+class InstanceMonitoringViewTestCase(BaseViewTestCase, MockInstanceMixin):
+
+    def test_instance_monitoring_view_duration_choices(self):
+        request = testing.DummyRequest()
+        instance = self.make_instance()
+        view = InstanceMonitoringView(request, instance=instance).instance_monitoring()
+        duration_choices = dict(view.get('duration_choices'))
+        for choice in [3600, 10800, 21600, 43200, 86400, 259200, 604800, 1209600]:
+            assert choice in duration_choices
+
+    def test_instance_monitoring_state_on_aws(self):
+        session = {'cloud_type': 'aws'}
+        request = self.create_request(session=session)
+        instance = self.make_instance()
+        view = InstanceView(request, instance=instance).instance_view()
+        monitoring_state = view.get('instance_monitoring_state')
+        self.assertEqual(monitoring_state, u'Detailed')
+
+    def test_instance_monitoring_tab_title_on_aws(self):
+        session = {'cloud_type': 'aws'}
+        request = self.create_request(session=session)
+        instance = self.make_instance()
+        view = InstanceMonitoringView(request, instance=instance).instance_monitoring()
+        monitoring_tab_title = view.get('monitoring_tab_title')
+        self.assertEqual(monitoring_tab_title, u'Detailed Monitoring')
+
+
+class InstanceTypeChoicesTestCase(BaseViewTestCase):
+    def test_aws_instance_type_choices(self):
+        aws_instance_types = [name for name, desc in AWS_INSTANCE_TYPE_CHOICES]
+        expected_instance_types = [
+            't1.micro', 't2.micro', 't2.small', 't2.medium', 't2.large', 'm1.small', 'm1.medium', 'm1.large',
+            'm1.xlarge', 'm2.xlarge', 'm2.2xlarge', 'm2.4xlarge', 'm3.medium', 'm3.large', 'm3.xlarge', 'm3.2xlarge',
+            'm4.large', 'm4.xlarge', 'm4.2xlarge', 'm4.4xlarge', 'm4.10xlarge', 'c1.medium', 'c1.xlarge', 'cg1.4xlarge',
+            'cr1.8xlarge', 'cc2.8xlarge', 'c3.large', 'c3.xlarge', 'c3.2xlarge', 'c3.4xlarge', 'c3.8xlarge',
+            'c4.large', 'c4.xlarge', 'c4.2xlarge', 'c4.4xlarge', 'c4.8xlarge', 'g2.2xlarge', 'g2.8xlarge', 'r3.large',
+            'r3.xlarge', 'r3.2xlarge', 'r3.4xlarge', 'r3.8xlarge', 'hi1.4xlarge', 'hs1.8xlarge', 'i2.xlarge',
+            'i2.2xlarge', 'i2.4xlarge', 'i2.8xlarge', 'd2.xlarge', 'd2.2xlarge', 'd2.4xlarge', 'd2.8xlarge',
+        ]
+        for instance_type in expected_instance_types:
+            self.assertEqual(instance_type in aws_instance_types, True)

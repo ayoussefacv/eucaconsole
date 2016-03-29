@@ -1,6 +1,7 @@
 <metal:block use-macro="main_template" i18n:domain="eucaconsole">
 
 <div metal:fill-slot="head_css" tal:omit-tag="">
+    <meta http-equiv="refresh" content="${login_refresh}"/>
     <link rel="stylesheet" href="${request.static_path('eucaconsole:static/css/pages/login.css')}" />
 </div>
 
@@ -46,23 +47,26 @@
                 <dl class="tabs" id="login-tabs" data-tab="">
                     <dd id="euca-tab" class="active">
                         <a href="#eucalyptus">
-                            <span class="hide-for-small" i18n:translate="">Log in to</span>&nbsp;<span i18n:translate="">Eucalyptus</span>
+                            <span class="hide-for-small" i18n:translate="">Log in to Eucalyptus</span>
+                            <span class="show-for-small" i18n:translate="">Eucalyptus</span>
                         </a>
                     </dd>
                     <dd id="aws-tab" tal:condition="layout.aws_enabled">
                         <a href="#aws">
-                            <span i18n:translate="" class="hide-for-small">Log in to</span>&nbsp;<span i18n:translate="">AWS</span>
+                            <span class="hide-for-small" i18n:translate="">Log in to AWS</span>
+                            <span class="show-for-small" i18n:translate="">AWS</span>
                         </a>
                     </dd>
                 </dl>
                 <div class="tabs-content">
-                    <div class="content active large-10 medium-10 columns large-centered medium-centered" id="eucalyptus">
+                    <div class="content active" id="eucalyptus">
                         <form class="custom" id="euca-login-form" method="post" name="euca_login_form" ng-submit="isLoggingIn=true"
                               action="${request.route_path('login')}?login_type=Eucalyptus">
                             <input type="hidden" name="came_from" value="${came_from}" />
+                            <input type="hidden" id="euca-region" name="euca-region" value="" />
                             <div class="row controls-wrapper controls_${field.name}" tal:repeat="field euca_login_form">
                                 <div class="small-12 columns field">
-                                    <label for="top-label" class="left">${field.label.text}<span class="req">*</span></label>
+                                    <label for="${field.id}" class="left stack-label">${field.label.text}<span class="req">*</span></label>
                                     <!--! Note: Don't remove non-bindable attr in this form -->
                                     <div tal:condition="field.name == 'password'">
                                         <div tal:condition="layout.browser_password_save == 'false'" ng-non-bindable="">
@@ -89,10 +93,9 @@
                                     </button>
                                 </div>
                                 <div class="small-12 columns" ng-show="isLoggingIn">
-                                    <span i18n:translate="">Logging in</span>&nbsp;<em><span class="dots">&nbsp;</span></em>
+                                    <span i18n:translate="">Logging in</span>&nbsp;<i class="busy"></i>
                                 </div>
                             </div>
-                            <div>&nbsp;</div>
                             <div class="row">
                                 <div class="small-12 columns">
                                     <a target="_blank" href="${layout.support_url}" i18n:translate="">Forgot your password?</a>
@@ -100,7 +103,7 @@
                             </div>
                         </form>
                     </div>
-                    <div class="content large-10 medium-10 columns large-centered medium-centered"
+                    <div class="content"
                          tal:condition="layout.aws_enabled" id="aws">
                         <form class="custom" id="aws-login-form" method="post" name="aws_login_form" ng-submit="isLoggingIn=true"
                               action="${request.route_path('login')}?login_type=AWS">
@@ -108,7 +111,7 @@
                             <input type="hidden" id="duration" name="duration" value="${duration}" />
                             <div class="row controls-wrapper controls_${field.name}" tal:repeat="field aws_login_form">
                                 <div class="small-12 columns field">
-                                    <label for="top-label" class="left">${field.label.text}<span class="req">*</span></label>
+                                    <label for="${field.id}" class="left stack-label">${field.label.text}<span class="req">*</span></label>
                                     <!--! Note: Don't remove non-bindable attr in this form -->
                                     <div tal:condition="field.name == 'secret_key'">
                                         <div tal:condition="layout.browser_password_save == 'false'" ng-non-bindable="">
@@ -135,10 +138,9 @@
                                     </button>
                                 </div>
                                 <div class="small-12 columns" ng-show="isLoggingIn" ng-cloak="">
-                                    <span i18n:translate="">Logging in</span>&nbsp;<em><span class="dots">&nbsp;</span></em>
+                                    <span i18n:translate="">Logging in</span>&nbsp;<i class="busy"></i>
                                 </div>
                             </div>
-                            <div>&nbsp;</div>
                             <div class="row">
                                 <div class="small-12 columns">
                                     <span i18n:translate="">Need to access an IAM account?</span><br />

@@ -6,7 +6,7 @@
 
 <div metal:fill-slot="main_content" ng-app="BucketsPage" ng-controller="BucketsCtrl"
      ng-init="initController('${controller_options_json}')">
-    <div class="row" id="contentwrap" ng-app="LandingPage" ng-controller="ItemsCtrl"
+    <div class="row" id="contentwrap" ng-controller="ItemsCtrl"
          ng-init="initController('buckets', '${initial_sort_key}', '${json_items_endpoint}')">
         <metal:breadcrumbs metal:use-macro="layout.global_macros['breadcrumbs']">
             <metal:crumbs metal:fill-slot="crumbs">
@@ -18,12 +18,28 @@
         <h3 id="pagetitle"><strong i18n:translate="">Buckets</strong></h3>
         <div metal:use-macro="layout.global_macros['landing_page_datagrid']">
             <div metal:fill-slot="new_button">
-                <a class="button" id="create-bucket-btn" i18n:translate="" href="${request.route_path('bucket_new')}">
-                    Create Bucket
+                <a id="create-bucket-btn" class="button"
+                    href="${request.route_path('bucket_new')}" i18n:translate="">Create Bucket</a>
+                <a id="open-shared-btn" class="button secondary split" data-reveal-id="open-shared-modal">
+                    <span i18n:translate="" tal:omit-tag="">Open Shared Bucket</span>
+                    <span class="euca-split" data-dropdown="download-drop"></span>
                 </a>
+                <ul id="download-drop" class="f-dropdown" data-dropdown-content="">
+                    <li>
+                        <a id="download-object-btn" i18n:translate=""
+                            data-reveal-id="download-object-modal">Download Object</a>
+                    </li>
+                    <li>
+                        <a id="upload-object-btn" i18n:translate="" target="_blank"
+                            href="${request.route_path('bucket_upload', name='__shared__', subpath='')}">Upload Object(s)</a>
+                    </li>
+                </ul>
             </div>
             <div metal:fill-slot="tile_header">
-                <a ng-href="{{ item.contents_url }}" class="has-bucket-icon">
+                <a ng-href="{{ item.contents_url }}" class="has-shared-icon" ng-show="item.shared">
+                    {{ item.bucket_name }}
+                </a>
+                <a ng-href="{{ item.contents_url }}" class="has-bucket-icon" ng-hide="item.shared">
                     {{ item.bucket_name }}
                 </a>
             </div>
@@ -31,30 +47,30 @@
                 <div>
                     <span class="label" title="Object Count" i18n:attributes="title" data-tooltip="">OB</span>
                     <span>
-                        <span class="dots" ng-show="countsLoading[item.bucket_name]"></span>
+                        <i ng-show="countsLoading[item.bucket_name]" class="busy" ></i>
                         <a ng-href="{{ item.contents_url }}">
-                            <b>{{ bucketCounts[item.bucket_name] }}</b>
+                            <span>{{ bucketCounts[item.bucket_name] }}</span>
                         </a>
                     </span>
                 </div>
                 <div>
                     <span class="label" title="Versioning" i18n:attributes="title" data-tooltip="">VE</span>
                     <span>
-                        <span class="dots" ng-show="versioningStatusLoading[item.bucket_name]"></span>
-                        <b>{{ bucketVersioningStatus[item.bucket_name] }}</b>
+                        <i ng-show="versioningStatusLoading[item.bucket_name]" class="busy" ></i>
+                        <span>{{ bucketVersioningStatus[item.bucket_name] }}</span>
                     </span>
                 </div>
                 <div>
                     <span class="label" title="Creation Time" i18n:attributes="title" data-tooltip="">CT</span>
                     <span ng-show="item.creation_date">
-                        <b>{{ item.creation_date | date: '${layout.angular_date_format}' }}</b>
+                        <span>{{ item.creation_date | date: '${layout.angular_date_format}' }}</span>
                     </span>
                 </div>
             </div>
             <div metal:fill-slot="tile_dropdown_button" tal:omit-tag="">
                 <a id="tile-item-dropdown_{{ item.bucket_name | escapeHTMLTagID }}"
                    class="tiny secondary button dropdown right"
-                   data-dropdown="item-dropdown_{{ item.bucket_name |  escapeHTMLTagID }}"><i class="fi-widget"></i></a>
+                   data-dropdown="item-dropdown_{{ item.bucket_name |  escapeHTMLTagID }}"><i class="grid-action"></i></a>
                 <ul id="item-dropdown_{{ item.bucket_name | escapeHTMLTagID }}" class="f-dropdown" data-dropdown-content="">
                     <li>
                         <a i18n:translate="" ng-href="{{ item.contents_url }}">View contents</a>
@@ -73,14 +89,14 @@
                             </span>
                         </a>
                     </li>
-                    <li ng-show="bucketCanCopyItem(item)">
-                        <a i18n:translate="" ng-click="doPaste(item)">Paste object</a>
+                    <li ng-show="bucketCanCopyItem(item) || bucketCanCopyFolder(item)">
+                        <a i18n:translate="" ng-click="doPaste(item)">Paste</a>
                     </li>
-                    <li ng-show="bucketCanCopyFolder(item)">
-                        <a i18n:translate="" ng-click="doPaste(item)">Paste folder</a>
-                    </li>
-                    <li>
+                    <li ng-show="!item.shared">
                         <a i18n:translate="" ng-click="revealModal('delete-bucket', item)">Delete</a>
+                    </li>
+                    <li ng-show="item.shared">
+                        <a i18n:translate="" ng-click="removeShared(item)">Remove from view</a>
                     </li>
                 </ul>
             </div>
@@ -93,18 +109,21 @@
             </metal:block>
             <metal:block metal:fill-slot="tableview_columns">
                 <td>
-                    <a ng-href="{{ item.contents_url }}" class="has-bucket-icon">
+                    <a ng-href="{{ item.contents_url }}" class="has-shared-icon" ng-show="item.shared">
+                        {{ item.bucket_name }}
+                    </a>
+                    <a ng-href="{{ item.contents_url }}" class="has-bucket-icon" ng-hide="item.shared">
                         {{ item.bucket_name }}
                     </a>
                 </td>
                 <td class="count">
-                    <span class="dots" ng-show="countsLoading[item.bucket_name]"></span>
+                    <i ng-show="countsLoading[item.bucket_name]" class="busy" ></i>
                     <a ng-show="!countsLoading[item.bucket_name]" ng-href="{{ item.contents_url }}">
                         {{ bucketCounts[item.bucket_name] }}
                     </a>
                 </td>
                 <td>
-                    <span class="dots" ng-show="versioningStatusLoading[item.bucket_name]"></span>
+                    <i ng-show="versioningStatusLoading[item.bucket_name]" class="busy" ></i>
                     {{ bucketVersioningStatus[item.bucket_name] }}
                 </td>
                 <td>{{ item.creation_date | date: '${layout.angular_date_format}' }}</td>
@@ -112,7 +131,7 @@
                     <span class="actions">
                         <a id="table-item-dropdown_{{ item.bucket_name | escapeHTMLTagID }}"
                            class="tiny secondary button dropdown right round"
-                           data-dropdown="item-dropdown_{{ item.bucket_name | escapeHTMLTagID }}"><i class="fi-widget"></i></a>
+                           data-dropdown="item-dropdown_{{ item.bucket_name | escapeHTMLTagID }}"><i class="grid-action"></i></a>
                         <ul id="item-dropdown_{{ item.bucket_name | escapeHTMLTagID }}" class="f-dropdown" data-dropdown-content="">
                             <li>
                                 <a i18n:translate="" ng-href="{{ item.contents_url }}">View contents</a>
@@ -131,14 +150,14 @@
                                     </span>
                                 </a>
                             </li>
-                            <li ng-show="bucketCanCopyItem(item)">
-                                <a i18n:translate="" ng-click="doPaste(item)">Paste object</a>
+                            <li ng-show="bucketCanCopyItem(item) || bucketCanCopyFolder(item)">
+                                <a i18n:translate="" ng-click="doPaste(item)">Paste</a>
                             </li>
-                            <li ng-show="bucketCanCopyFolder(item)">
-                                <a i18n:translate="" ng-click="doPaste(item)">Paste folder</a>
-                            </li>
-                            <li>
+                            <li ng-show="!item.shared">
                                 <a i18n:translate="" ng-click="revealModal('delete-bucket', item)">Delete</a>
+                            </li>
+                            <li ng-show="item.shared">
+                                <a i18n:translate="" ng-click="removeShared(item)">Remove from view</a>
                             </li>
                         </ul>
                     </span>
@@ -147,12 +166,74 @@
         </div>
         <!--! Modal dialogs reused across landing and detail page -->
         ${panel('bucket_dialogs', landingpage=True, versioning_form=versioning_form, delete_form=delete_form)}
+        <div id="open-shared-modal" class="reveal-modal medium" data-reveal="">
+            <h3 i18n:translate="">Open shared bucket</h3>
+            <p i18n:translate="">
+                Shared buckets are in other accounts, so you must enter a name to access their contents from your account.
+            </p>
+            <p i18n:translate="">
+                If you do not have permissions to open a shared bucket, you may still have permissions to download objects from it or upload files to it. Try those actions if this one fails and you believe you should have access.
+            </p>
+            <form id="open-shared-form" data-abide="abide">
+                <div class="controls-wrapper">
+                    <label class="left">
+                        <span i18n:translate="">Bucket name</span>&nbsp;<span class="req">*</span>
+                    </label>
+                    <br/>
+                    <div class="flex-space">
+                        <div class="flex-column-0">
+                            <span i18n:translate="">S3://</span>&nbsp;
+                        </div>
+                        <div class="flex-column-1">
+                            <input id="shared-bucket-name" type="text" ng-model="sharedBucketName" pattern="${bucket_name_pattern}"/>
+                            <small class="error" i18n:translate="">Name may only contain lowercase letters, numbers, hyphens, and/or dots</small>
+                        </div>
+                    </div>
+                    <div class="dialog-option">
+                        <input type="checkbox" id="save-bucket-to-list"/>&nbsp;<span i18n:translate="">Save this bucket to my list</span>
+                    </div>
+                    <a id="open-bucket-btn" class="button expand" ng-disabled="!sharedBucketName"
+                       ng-click="openSharedBucket($event)" i18n:translate="">Open Bucket</a>
+                </div>
+            </form>
+            <a href="#" id="open-shared-close-link" class="close-reveal-modal">&#215;</a>
+        </div>
+        <div id="download-object-modal" class="reveal-modal medium" data-reveal="">
+            <h3 i18n:translate="">Download object</h3>
+            <p i18n:translate="">
+                You can download an object from a bucket in your own account, or a shared object from a bucket in another account, as long as you provide a full path (including the bucket name) to the object.
+            </p>
+            <form id="download-object-form" data-abide="abide">
+                <div class="controls-wrapper">
+                    <label class="left">
+                        <span i18n:translate="">Object path</span>&nbsp;<span class="req">*</span>
+                        <span class="" i18n:attributes="title" data-tooltip=""
+                            title="Enter the full path to the object, including the bucket name">
+                            <i class="helptext-icon"></i>
+                        </span>
+                    </label>
+                    <br/>
+                    <div class="flex-space">
+                        <div class="flex-column-0">
+                            <span i18n:translate="">S3://</span>&nbsp;
+                        </div>
+                        <div class="flex-column-1">
+                            <input id="shared-object-path" type="text" ng-model="sharedObjectPath" pattern="${object_path_pattern}"/>
+                            <small class="error" i18n:translate="">Path must contain lowercase letters, numbers, hyphens, and/or dots followed by slash, then any other characters</small>
+                        </div>
+                    </div>
+                    <a id="download-object-btn" class="button expand" ng-disabled="!sharedObjectUrl"
+                       ng-click="closeDialog()" ng-href="{{ sharedObjectUrl }}" i18n:translate="">Download Object</a>
+                </div>
+            </form>
+            <a href="#" id="download-object-close-link" class="close-reveal-modal">&#215;</a>
+        </div>
     </div>
 </div>
 
 
 <div metal:fill-slot="tail_js">
-    <script src="${request.static_path('eucaconsole:static/js/pages/custom_filters.js')}"></script>
+    <script src="${request.static_path('eucaconsole:static/js/widgets/expando.js')}"></script>
     <script src="${request.static_path('eucaconsole:static/js/pages/landingpage.js')}"></script>
     <script src="${request.static_path('eucaconsole:static/js/pages/buckets.js')}"></script>
 </div>

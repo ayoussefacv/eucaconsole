@@ -12,9 +12,9 @@ angular.module('KeypairPage', ['EucaConsoleUtils'])
         $scope.routeID = '';
         $scope.initController = function (optionsJson) {
             var options = JSON.parse(eucaUnescapeJson(optionsJson));
-            $scope.routeID = options['route_id'];
-            if (options['keypair_created']) {
-                Notify.success(options['keypair_created_msg']); // Display success notice if new key pair was created
+            $scope.routeID = options.route_id;
+            if (options.keypair_created) {
+                Notify.success(options.keypair_created_msg); // Display success notice if new key pair was created
             }
             $scope.setWatch();
             $scope.setFocus();
@@ -64,7 +64,7 @@ angular.module('KeypairPage', ['EucaConsoleUtils'])
                 // Prevent import key pair textarea from being disabled on IE
                 $('#key-import-contents').removeAttr('maxlength');
             });
-            $(document).on('opened', '[data-reveal]', function () {
+            $(document).on('opened.fndtn.reveal', '[data-reveal]', function () {
                 var modal = $(this);
                 var modalID = $(this).attr('id');
                 if( modalID.match(/terminate/)  || modalID.match(/delete/) || modalID.match(/release/) ){

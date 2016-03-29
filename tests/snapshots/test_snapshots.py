@@ -1,4 +1,4 @@
-# Copyright 2013-2014 Eucalyptus Systems, Inc.
+# Copyright 2013-2015 Hewlett Packard Enterprise Development LP
 #
 # Redistribution and use of this software in source and binary forms,
 # with or without modification, are permitted provided that the following
@@ -29,6 +29,9 @@ Snapshots tests
 See http://docs.pylonsproject.org/projects/pyramid/en/latest/narr/testing.html
 
 """
+from boto.ec2 import connect_to_region
+from moto import mock_ec2
+
 from pyramid import testing
 from pyramid.httpexceptions import HTTPNotFound
 
@@ -38,6 +41,16 @@ from eucaconsole.views import TaggedItemView, JSONResponse
 from eucaconsole.views.snapshots import SnapshotsView, SnapshotView, SnapshotsJsonView
 
 from tests import BaseViewTestCase, BaseFormTestCase
+
+
+class MockSnapshotMixin(object):
+    @staticmethod
+    @mock_ec2
+    def make_snapshot(volume=None, description='test snapshot description'):
+        ec2_conn = connect_to_region('us-east-1')
+        volume = volume or ec2_conn.create_volume(1, 'us-east-1a')
+        snapshot = ec2_conn.create_snapshot(volume.id, description)
+        return snapshot, ec2_conn
 
 
 class SnapshotsViewTests(BaseViewTestCase):
@@ -58,7 +71,6 @@ class SnapshotsViewTests(BaseViewTestCase):
         view = SnapshotsJsonView(request).snapshots_json()
         self.assertEqual(view.__class__, JSONResponse)
         
-
 
 class SnapshotViewTests(BaseViewTestCase):
     """Snapshot detail page view"""
@@ -115,4 +127,18 @@ class SnapshotDeleteFormTestCase(BaseFormTestCase):
     def test_secure_form(self):
         self.has_field('csrf_token')
         self.assertTrue(issubclass(self.form_class, BaseSecureForm))
+
+
+class MockSnapshotViewTestCase(BaseViewTestCase, MockSnapshotMixin):
+
+    @mock_ec2
+    def test_snapshot_detail_view(self):
+        snapshot, conn = self.make_snapshot()
+        request = self.create_request(matchdict=dict(id=snapshot.id))
+        view = SnapshotView(request, ec2_conn=conn).snapshot_view()
+        view_snapshot = view.get('snapshot')
+        self.assertEqual(view_snapshot.id, snapshot.id)
+        self.assertEqual(view.get('snapshot_name'), snapshot.id)
+        self.assertEqual(view.get('snapshot_description'), u'test snapshot description')
+        self.assertEqual(view.get('exists_volume'), True)
 

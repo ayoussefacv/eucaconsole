@@ -2,6 +2,12 @@
 /* Set the link colors and styles for top-level nav */
 /* ----------------------------------------- Item list
 ----------------------------------------- */
+.tabs { max-height: 2.6rem !important; }
+.tabs dd { position: relative; top: 1px; z-index: 999; }
+.tabs dd a { padding: 10px 32px 6px 24px; color: #666666; background-color: transparent; font-family: Metric-Semibold, Helvetica, Arial, sans-serif; }
+.tabs dd a:hover { border-bottom: 2px solid #666666; background-color: transparent; text-decoration: none; }
+.tabs dd.active a { color: #000000; font-family: Metric-Semibold, Helvetica, Arial, sans-serif; background-color: transparent; border-bottom: 2px solid #000000; }
+
 .tabs-content { background-color: white; }
 .tabs-content p { line-height: 1.3rem; }
 .tabs-content .small-10.columns { padding-left: 0; }
@@ -17,13 +23,12 @@
 
 #policy-preview { background-color: white; padding: 1rem; margin-top: 40px; }
 #policy-preview input[type=text], #policy-preview textarea { background-color: white; }
-#policy-preview h6.title { font-weight: bold; color: #03405f; margin-bottom: 1rem; }
 
 #policy-generator { border-color: #cccccc; border-left: none; border-right: none; width: 100%; }
 #policy-generator tr.namespace { border-top: 1px solid #cccccc; background-color: white; }
 #policy-generator tr.namespace td { font-size: 1rem; }
-#policy-generator th.allow, #policy-generator th.deny { text-transform: uppercase; width: 40px; }
-#policy-generator td { font-size: 0.9rem; line-height: 1rem; }
+#policy-generator th.allow, #policy-generator th.deny { text-transform: uppercase; font-size: 18px; width: 40px; }
+#policy-generator td { font-size: 16px; line-height: 1rem; }
 #policy-generator td.allow, #policy-generator td.deny { text-align: center; }
 #policy-generator td h6 { margin-bottom: 4px; }
 #policy-generator td .resource-wrapper { vertical-align: top; margin-bottom: 1rem; }
@@ -43,7 +48,7 @@
 #policy-generator td .advanced .chosen-search input[type=text] { width: 100%; }
 #policy-generator td label { margin-bottom: 2px; margin-top: 6px; }
 #policy-generator td i.tick { color: #cccccc; font-size: 1.2rem; }
-#policy-generator td i.tick.fi-check.selected { color: #03405f; }
+#policy-generator td i.tick.fi-check.selected { color: #425563; }
 #policy-generator td i.tick.fi-x.selected { color: darkred; }
 
 #create-iam-policy-btn { margin-top: 1rem; }

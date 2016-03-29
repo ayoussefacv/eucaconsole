@@ -3,32 +3,39 @@
 
 $dashboard-panel-tile-height: 240px;
 $dashboard-panel-padding: 4px;
-$dashboard-panel-border-width: 4px;
-$dashboard-panel-border-color: $euca-lightgrey;
 $dashboard-panel-icon-size: 100px;
 
 
 #maincontent {
     padding-top: 1rem;
-    background: #eef7e3;
     #pagetitle {
         margin-bottom: 0.5rem;
         margin-left: 0;
         margin-top: 1rem;
         h3 {
-            font-weight: bold;
+            font-family: $euca-header-font-family;
+            font-size: $euca-xl-font-size;
             margin-top: 0;
             display: inline-block;
         }
         #zone-selector {
             display: inline-block;
             margin-left: 1rem;
+            font-family: $euca-text-font-family; 
+            font-size: $euca-font-size;
+            &:hover {
+            text-decoration: underline;
+            }
         }
         #reset-dash {
             margin-top: 1.25rem;
-            font-size: 0.825rem;
+            font-family: $euca-text-font-family;
+            font-size: $euca-font-size;
             display: inline-block;
             float: right;
+            &:hover {
+            text-decoration: underline;
+            }
         }
     }
 }
@@ -41,16 +48,26 @@ $tile-row-height: 24px;
     margin-bottom: 0;
     box-sizing: border-box;
     position: relative;
-    font-size: 0.825rem;
+    font-size: $euca-font-size;
     .tile {
         background-color: white;
         position: relative;
         height: $dashboard-panel-tile-height;
         padding: 4px 8px;
         .subheader {
-            font-size: 1rem;
-            font-weight: 500;
+            font-family: $euca-text-font-family;
+            font-size: $euca-font-size;
+            color: $hpe-gray;
             margin: 0 0 0 0;
+        }
+        i.fa-bell {
+            color: white !important;
+        }
+        i.dash-no-alarms {
+            color: $hpe-gray !important;
+        }
+        i.dash-alarms {
+            color: red !important;
         }
         .icon {  // Font icons
             position: absolute;
@@ -62,13 +79,20 @@ $tile-row-height: 24px;
             color: white;
             font-size: 3rem;
             em {  // Item counts
-                font-size: 1.3rem;
-                font-weight: bold;
+                font-size: $euca-xl-font-size;
                 position: absolute;
                 bottom: -40%; left: 0; right: 0;
                 text-align: center;
-                color: black;
+                color: $hpe-gray;
+                font-family: $euca-header-font-family;
                 font-style: normal;
+                &:hover {
+                    text-decoration: underline;
+                    color: $hpe-green;
+                }
+                i { // busy
+                    color: black;
+                }
             }
         }
         .footer {
@@ -77,7 +101,7 @@ $tile-row-height: 24px;
             left: 1rem; right: 1rem; bottom: 8px;
             text-align: center;
             a {
-                font-weight: bold;
+                font-size: $euca-font-size;
                 &:hover {
                     text-decoration: underline;
                 }
@@ -91,32 +115,21 @@ $tile-row-height: 24px;
             }
         }
         .dropdown.button.tiny {
-            z-index: 99999;
+            z-index: 99998;
             background: none;
             box-shadow: none;
             position: absolute;
             width: 30px; height: $tile-row-height;
             top: 0; right: 0;
-            color: $euca-green;
+            color: $hpe-gray;
             font-size: 1.1rem;
             padding: 0 0 0 0;
-            border-top: none;
-            border-right: none;
+            border: none;
             &:hover {
-                color: $euca-green;
+                color: $hpe-green;
             }
-            &::before {
+            &::before, &::after {
                 border: none;
-            }
-            .fi-widget {
-                position: relative;
-                top: 4px;
-                background-image: url(../../img/svg/gear.svg);
-                display: inline-block;
-                width: 20px; height: 20px;
-                &::before {
-                    content: " "
-                }
             }
         }
         .f-dropdown {
@@ -136,7 +149,8 @@ $tile-row-height: 24px;
                 position: absolute;
                 top: 0; bottom: 0; left: 0; right: 0;
                 &:hover {
-                    background-color: lighten($euca-lightgreen, 30%);
+                    background-color: $hpe-hovergray;
+                    text-decoration: none;
                 }
             }
             .plus {
@@ -147,16 +161,33 @@ $tile-row-height: 24px;
     }
 }
 
+li#alarms {
+    .tile {
+        .content {
+            padding-top: 0.8rem;
+            width: 100%;
+            text-align: center;
+        }
+    }
+}
+
+// replace fa-4x or fa-5x
+.euca-dash-size {
+    font-size: 3.65em;
+}
+
 // SVG icons
 #instances-running .icon { background-image: url(../../img/svg/icon_running_instances.svg); }
 #instances-stopped .icon { background-image: url(../../img/svg/icon_stopped_instances.svg); }
 #scaling-groups .icon { background-image: url(../../img/svg/icon_instances_scaling_groups.svg); }
+#stacks .icon { background-image: url(../../img/svg/icon_cloud_formation.svg); }
 #elastic-ips .icon { background-image: url(../../img/svg/icon_elastic_IP.svg); }
 #volumes .icon { background-image: url(../../img/svg/icon_volumes.svg); }
 #snapshots .icon { background-image: url(../../img/svg/icon_snapshot.svg); }
 #buckets .icon { background-image: url(../../img/svg/icon_buckets.svg); }
 #security-groups .icon { background-image: url(../../img/svg/icon_security_groups.svg); }
 #key-pairs .icon { background-image: url(../../img/svg/icon_key-pair.svg); }
+#load-balancers .icon { background-image: url(../../img/svg/icon_load_balancing.svg); }
 #accounts .icon { background-image: url(../../img/svg/icon_IAM_accounts.svg); }
 #users .icon { background-image: url(../../img/svg/icon_IAM_users.svg); }
 #groups .icon { background-image: url(../../img/svg/IAM_group.svg); }
@@ -167,21 +198,29 @@ $tile-row-height: 24px;
     margin-top: 13px;
 }
 
+#instances-running {
+    .footer .button {
+        // Launch Instance button
+        position: relative;
+        bottom: 8px;
+    }
+}
+
 
 // Health status tile
 #health {
     .statusrow {
-        font-size: 11pt;
+        font-size: 10pt;
         text-align: left;
-        color: $euca-grey;
+        color: $hpe-gray;
         margin-top: 10px;
-        line-height: 1.4rem;
+        line-height: 1.2rem;
         .status {
             position: relative;
             left: 8px;
         }
         i.service-up {
-            color: $euca-darkblue;
+            color: $hpe-green;
             font-size: 16pt;
             text-align: left;
         }
@@ -191,7 +230,7 @@ $tile-row-height: 24px;
             text-align: left;
         }
         i.service-denied {
-            color: $euca-darkgrey;
+            color: $hpe-gray;
             font-size: 16pt;
             text-align: left;
         }

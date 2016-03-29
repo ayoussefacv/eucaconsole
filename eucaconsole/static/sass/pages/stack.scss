@@ -1,0 +1,18 @@
+/* @fileOverview Cloud Formations landing page CSS */
+@import "../includes/landingpage";
+
+.content {
+    width: 100%;
+    padding-left: 10px;
+    padding-right: 10px;
+}
+
+.panel {
+    overflow: hidden;
+    min-height: 400px;
+}
+
+/* override for height of template view dialog */
+.CodeMirror {
+    height: 450px;
+}

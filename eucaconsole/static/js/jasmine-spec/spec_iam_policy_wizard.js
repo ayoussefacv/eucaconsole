@@ -24,7 +24,7 @@ describe("IAMPolicyWizard", function() {
         var template = window.__html__['templates/policies/iam_policy_wizard.pt'];
         // remove <script src> and <link> tags to avoid phantomJS error
         template = template.replace(/script src/g, "script ignore_src"); 
-        template = template.replace(/\<link/g, "\<ignore_link"); 
+        template = template.replace(/<link/g, "<ignore_link"); 
         setFixtures(template);
     });
 
@@ -70,10 +70,5 @@ describe("IAMPolicyWizard", function() {
             expect(scope.cloudType).toEqual('aws');
         });
 
-        it("Should call initDateTimePickers() when initController() is called and cloudType is euca", function() {
-            spyOn(scope, 'initDateTimePickers');
-            scope.initController('{"cloudType": "euca", "policyActions": [{"actions": []}]}');
-            expect(scope.initDateTimePickers).toHaveBeenCalled();
-        });
     });
 });

@@ -4,9 +4,9 @@
  *
  */
 
-describe("AccountPage", function() {
+describe("CreateAccountPage", function() {
 
-    beforeEach(angular.mock.module('AccountPage'));
+    beforeEach(angular.mock.module('CreateAccountPage'));
 
     var scope, ctrl;
     // inject the $controller and $rootScope services
@@ -15,7 +15,7 @@ describe("AccountPage", function() {
         // Create a new scope that's a child of the $rootScope
         scope = $rootScope.$new();
         // Create the controller
-        ctrl = $controller('AccountPageCtrl', {
+        ctrl = $controller('CreateAccountPageCtrl', {
             $scope: scope
         });
     }));
@@ -24,7 +24,7 @@ describe("AccountPage", function() {
         var template = window.__html__['templates/accounts/account_new.pt'];
         // remove <script src> and <link> tags to avoid phantomJS error
         template = template.replace(/script src/g, "script ignore_src"); 
-        template = template.replace(/\<link/g, "\<ignore_link"); 
+        template = template.replace(/<link/g, "<ignore_link"); 
         setFixtures(template);
     });
 

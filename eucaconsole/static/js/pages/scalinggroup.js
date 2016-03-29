@@ -5,42 +5,91 @@
  */
 
 // Scaling Group page includes the AutoScale tag editor, so pull in that module as well.
-angular.module('ScalingGroupPage', ['AutoScaleTagEditor', 'EucaConsoleUtils'])
-    .controller('ScalingGroupPageCtrl', function ($scope, $timeout, eucaUnescapeJson) {
+angular.module('ScalingGroupPage', ['TagEditorModule', 'EucaConsoleUtils'])
+    .directive('chosen', function () {
+        return {
+            scope: {
+                model: '=ngModel'
+            },
+            restrict: 'A',
+            require: 'ngModel',
+            link: function (scope, element, attrs, ctrl) {
+                var chosenAttrs = JSON.parse(attrs.chosen || '{}');
+                for(var key in attrs) {
+                    if(/^chosen-.*/.test(key)) {
+                        chosenAttrs[key] = attrs[key];
+                    }
+                }
+                element.chosen(chosenAttrs);
+
+                element.on('change', function () {
+                    scope.validateField(this);
+                });
+            },
+            controller: ['$scope', '$element', function ($scope, $element) {
+                $scope.validateField = function (element) {
+                    var isValid = element[0].selectedIndex > -1,
+                        form = this.form && this.form.name,
+                        field = this.name;
+
+                    if(form && field) {
+                        $scope[form][field].$setValidity('required', isValid);
+                    }
+                };
+
+                $scope.$watch('model', function () {
+                    $scope.validateField($element);
+                });
+            }]
+        };
+    })
+    .controller('ScalingGroupPageCtrl', function ($scope, $timeout, eucaUnescapeJson, eucaNumbersOnly) {
         $scope.minSize = 1;
         $scope.desiredCapacity = 1;
         $scope.maxSize = 1;
+        $scope.terminationPoliciesUpdate = [];
+        $scope.terminationPoliciesOrder = [];
         $scope.vpcSubnets = [];
         $scope.vpcSubnetZonesMap = {};
+        $scope.isNotValid = false;
         $scope.isNotChanged = true;
         $scope.isSubmitted = false;
         $scope.pendingModalID = '';
+
+        $scope.isInvalid = function () {
+            return $scope.scalingGroupDetailForm.$invalid;
+        };
+
         $scope.initChosenSelectors = function () {
-            $('#launch_config').chosen({'width': '60%', search_contains: true});
+            $('#launch_config').chosen({'width': '80%', search_contains: true});
             // Remove the option if it has no vpc subnet ID associated
             var selectVPCSubnetObject = $('#vpc_subnet option');
             if (selectVPCSubnetObject.length > 0) {
-                if (selectVPCSubnetObject.first().attr('value') == ''
-                    || selectVPCSubnetObject.first().attr('value') == 'None') {
+                if (selectVPCSubnetObject.first().attr('value') === '' ||
+                    selectVPCSubnetObject.first().attr('value') == 'None') {
                     selectVPCSubnetObject.first().remove();
                 } 
             }
             $('#vpc_subnet').chosen({'width': '80%', search_contains: true});
-            $('#availability_zones').chosen({'width': '80%', search_contains: true});
-            $('#termination_policies').chosen({'width': '80%', search_contains: true});
         };
         $scope.setInitialValues = function () {
             $scope.minSize = parseInt($('#min_size').val(), 10);
             $scope.desiredCapacity = parseInt($('#desired_capacity').val(), 10);
             $scope.maxSize = parseInt($('#max_size').val(), 10);
+            // the order of the termination policy select options need to be arranged
+            // before the chosen widget is initialized
+            $scope.rearrangeTerminationPoliciesOptions($scope.terminationPoliciesOrder);
             $scope.createVPCSubnetZonesMap();
             $scope.setInitialVPCSubnets();
         };
         $scope.initController = function (optionsJson) {
             var options = JSON.parse(eucaUnescapeJson(optionsJson));
             // scalingGroupName, policiesCount
-            $scope.scalingGroupName = options['scaling_group_name'];
-            $scope.policiesCount = options['policies_count'];
+            $scope.scalingGroupName = options.scaling_group_name;
+            $scope.policiesCount = options.policies_count;
+            $scope.terminationPoliciesUpdate = options.termination_policies;
+            $scope.terminationPoliciesOrder = options.termination_policies;
+            $scope.availabilityZones = options.availability_zones;
             $scope.setInitialValues();
             $scope.initChosenSelectors();
             $scope.setWatch();
@@ -50,6 +99,7 @@ angular.module('ScalingGroupPage', ['AutoScaleTagEditor', 'EucaConsoleUtils'])
             }, 100);
         };
         $scope.handleSizeChange = function () {
+            $scope.isNotChanged = false;
             // Adjust desired/max based on min size change
             if ($scope.desiredCapacity < $scope.minSize) {
                 $scope.desiredCapacity = $scope.minSize;
@@ -77,9 +127,34 @@ angular.module('ScalingGroupPage', ['AutoScaleTagEditor', 'EucaConsoleUtils'])
                 $scope.pendingModalID = '';
             }
         };
+        $scope.watchCapacityEntries = function () {
+            var entries = ['minSize', 'maxSize', 'desiredCapacity'];
+            angular.forEach(entries, function (item) {
+                $scope.$watch(item, function(newVal, oldVal) {
+                    if (newVal) {
+                        $scope[item] = eucaNumbersOnly(newVal);
+                        $scope.isNotValid = false;
+                    } else {
+                        $scope.isNotValid = true;
+                    }
+                });
+            });
+        };
         $scope.setWatch = function () {
-            $scope.$watch('vpcSubnets', function () { 
+            $scope.watchCapacityEntries();
+            $scope.$watch('terminationPoliciesUpdate', function (newVal, oldVal) {
+                // timeout is needed to ensure the chosen widget to complete its update
+                $timeout(function (){
+                    // When the termination policies chosen widget is updated, retreive the order the elements displayed
+                    $scope.updateTerminationPoliciesOrder(); 
+                    // Using the updated termination policies array to re-arrange the options in the select element
+                    $scope.rearrangeTerminationPoliciesOptions($scope.terminationPoliciesOrder);
+                    $scope.isNotValid = !newVal || (newVal.length === 0 && oldVal.length > 0);
+                });
+            }, true);
+            $scope.$watch('vpcSubnets', function (newVal, oldVal) {
                 $scope.disableVPCSubnetOptions();
+                $scope.isNotValid = !newVal || (newVal.length === 0 && oldVal.length > 0);
             }, true);
             // Monitor the action menu click
             $(document).on('click', 'a[id$="action"]', function (event) {
@@ -105,14 +180,15 @@ angular.module('ScalingGroupPage', ['AutoScaleTagEditor', 'EucaConsoleUtils'])
             $(document).on('click', '#unsaved-changes-warning-modal-leave-link', function () {
                 $scope.openModalById($scope.pendingModalID);
             });
-            $scope.$on('tagUpdate', function($event) {
-                $scope.isNotChanged = false;
-            });
             $(document).on('submit', '[data-reveal] form', function () {
                 $(this).find('.dialog-submit-button').css('display', 'none');                
                 $(this).find('.dialog-progress-display').css('display', 'block');                
             });
             $(document).on('change', 'input[type="number"]', function () {
+                var input = $(this);
+                if (/^\d+$/.test(input.val())) {
+                    $scope.isNotValid = false;
+                }
                 $scope.isNotChanged = false;
                 $scope.$apply();
             });
@@ -155,7 +231,7 @@ angular.module('ScalingGroupPage', ['AutoScaleTagEditor', 'EucaConsoleUtils'])
             $(document).on('ready', function(){
                 $('.tabs').find('a').get(0).focus();
             });
-            $(document).on('opened', '[data-reveal]', function () {
+            $(document).on('opened.fndtn.reveal', '[data-reveal]', function () {
                 var modal = $(this);
                 var modalID = $(this).attr('id');
                 if (modalID.match(/terminate/) || modalID.match(/delete/) || modalID.match(/release/)) {
@@ -184,9 +260,49 @@ angular.module('ScalingGroupPage', ['AutoScaleTagEditor', 'EucaConsoleUtils'])
                 modal.foundation('reveal', 'open');
                 modal.on('click', '.close-reveal-modal', function(){
                     if (modal.find('input#check-do-not-show-me-again').is(':checked')) {
-                        Modernizr.localstorage && localStorage.setItem(thisKey, "true");
+                        if (Modernizr.localstorage) {
+                            localStorage.setItem(thisKey, "true");
+                        }
                     }
                 });
+            }
+        };
+        // Update the termination policies options order
+        $scope.updateTerminationPoliciesOrder = function() {
+            // Retreive the order of the listed temination policies from the chosen widget
+            var orderArray = $.map($('#termination_policies_chosen .search-choice'), function(choice){
+                return $(choice).find('a.search-choice-close').first().data('optionArrayIndex');
+            });
+            // Using the index order array above to construct the actual termination policy array in order
+            var options = $('#termination_policies').find('option');
+            $scope.terminationPoliciesOrder = $.map(orderArray, function(index) {
+                return $(options[index]).val();     
+            });
+        };
+        // Reorder the termination policies selection options
+        $scope.rearrangeTerminationPoliciesOptions = function(policies) {
+            var select = $('#termination_policies');
+            var options = select.find('option');
+            if (options.length === 0 ) {
+                return;
+            }
+            // create an array of option elements that maps the order of input array 'policies' 
+            var newOptions = $.map(policies, function(policy) {
+                var mapped = '';
+                angular.forEach(options, function(option) {
+                    if ($(option).val() === policy) {
+                        mapped = option;
+                    } 
+                });
+                return mapped;
+            });
+            // appending duplicated elements into select will sort the items in order
+            select.append(newOptions); 
+            // after rearrange the order of the options, set the values on the select element
+            select.val(policies);
+            // update the chosen widget if it has been initialized on #termination_policies
+            if ($('#termination_policies_chosen').length > 0) {
+                select.trigger('chosen:updated');
             }
         };
         // Disable the vpc subnet options if they are in the same zone as the selected vpc subnets
@@ -217,7 +333,7 @@ angular.module('ScalingGroupPage', ['AutoScaleTagEditor', 'EucaConsoleUtils'])
             $scope.vpcSubnetZonesMap = {};
             $('#vpc_subnet').find('option').each(function() {
                 var vpcSubnetID = $(this).attr('value');
-                if (vpcSubnetID != null) {
+                if (vpcSubnetID !== null) {
                     var vpcSubnetString = $(this).text();
                     var splitArray = vpcSubnetString.split(' ');
                     $scope.vpcSubnetZonesMap[vpcSubnetID] = splitArray[splitArray.length-1];

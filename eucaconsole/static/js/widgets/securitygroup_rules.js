@@ -7,9 +7,9 @@
 angular.module('SecurityGroupRules', ['CustomFilters', 'EucaConsoleUtils'])
     .controller('SecurityGroupRulesCtrl', function ($scope, $http, $timeout, eucaUnescapeJson) {
         $http.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
-        $scope.rulesEditor = $('#rules-editor');
-        $scope.rulesTextarea = $scope.rulesEditor.find('textarea#rules');
-        $scope.rulesEgressTextarea = $scope.rulesEditor.find('textarea#rules_egress');
+        $scope.rulesEditor = undefined;
+        $scope.rulesTextarea = undefined;
+        $scope.rulesEgressTextarea = undefined;
         $scope.rulesArray = [];
         $scope.rulesEgressArray = [];
         $scope.jsonEndpoint='';
@@ -51,10 +51,13 @@ angular.module('SecurityGroupRules', ['CustomFilters', 'EucaConsoleUtils'])
         };
         $scope.initRules = function (optionsJson) {
             var options = JSON.parse(eucaUnescapeJson(optionsJson));
-            $scope.rulesArray = options['rules_array'];
-            $scope.rulesEgressArray = options['rules_egress_array'];
-            $scope.jsonEndpoint = options['json_endpoint'];
-            $scope.internetProtocolsJsonEndpoint = options['protocols_json_endpoint'];
+            $scope.rulesArray = options.rules_array;
+            $scope.rulesEgressArray = options.rules_egress_array;
+            $scope.jsonEndpoint = options.json_endpoint;
+            $scope.internetProtocolsJsonEndpoint = options.protocols_json_endpoint;
+            $scope.rulesEditor = $('#rules-editor');
+            $scope.rulesTextarea = $scope.rulesEditor.find('textarea#rules');
+            $scope.rulesEgressTextarea = $scope.rulesEditor.find('textarea#rules_egress');
             $scope.initInternetProtocols();
             $scope.syncRules();
             $scope.setWatchers();
@@ -73,7 +76,7 @@ angular.module('SecurityGroupRules', ['CustomFilters', 'EucaConsoleUtils'])
               success(function(oData) {
                 var results = oData ? oData.results : [];
                 var options = JSON.parse(results);
-                var pArray = options['internet_protocols'];
+                var pArray = options.internet_protocols;
                 // Create internet protocols number to name map
                 angular.forEach(pArray, function(protocol) {
                     $scope.internetProtocols[protocol[0]] = protocol[1];
@@ -94,10 +97,10 @@ angular.module('SecurityGroupRules', ['CustomFilters', 'EucaConsoleUtils'])
         };
         $scope.cleanupSelections = function () {
             $timeout( function(){
-                if( $('#ip-protocol-select').children('option').first().html() == '' ){
+                if( $('#ip-protocol-select').children('option').first().html() === '' ){
                     $('#ip-protocol-select').children('option').first().remove();
                 } 
-                if( $('#groupname-select').children('option').first().html() == '' ){
+                if( $('#groupname-select').children('option').first().html() === '' ){
                     $('#groupname-select').children('option').first().remove();
                 }
             }, 500);
@@ -106,11 +109,11 @@ angular.module('SecurityGroupRules', ['CustomFilters', 'EucaConsoleUtils'])
             // By default, the Add Rule button is enabled when entering the check
             $scope.isRuleNotComplete = false;
             // If any of the required input fields are mising, disable the Add Rule button
-            if( $scope.hasDuplicatedRule == true ){
+            if( $scope.hasDuplicatedRule === true ){
                 $scope.isRuleNotComplete = true;
             }
             if ($scope.selectedProtocol === 'custom') {
-                if ($scope.customProtocolDivClass === 'error' || $scope.customProtocol == '') {
+                if ($scope.customProtocolDivClass === 'error' || $scope.customProtocol === '') {
                     $scope.isRuleNotComplete = true;
                 }
             } else if( $scope.selectedProtocol !== 'icmp' && $scope.selectedProtocol !== '-1' ){
@@ -143,9 +146,9 @@ angular.module('SecurityGroupRules', ['CustomFilters', 'EucaConsoleUtils'])
                 }
             });
             $scope.$watch('customProtocol', function(){ 
-                if ($scope.customProtocol != '') {
+                if ($scope.customProtocol !== '') {
                     // error is customProtocol does not exist in the map
-                    if ($scope.verifyCustomProtocol() == false) {
+                    if ($scope.verifyCustomProtocol() === false) {
                         $scope.customProtocolDivClass = "error";
                     } else {
                         $scope.customProtocolDivClass = "";
@@ -231,7 +234,7 @@ angular.module('SecurityGroupRules', ['CustomFilters', 'EucaConsoleUtils'])
                     $scope.trafficType = 'ip';
                 });
             });
-            $(document).on('closed', '#create-securitygroup-modal', function () {
+            $(document).on('closed.fndtn.reveal', '#create-securitygroup-modal', function () {
                 $scope.$apply(function(){
                     $scope.rulesArray = [];  // Empty out the rules when the dialog is closed 
                     $scope.rulesEgressArray = [];  // Empty out the rules when the dialog is closed 
@@ -240,12 +243,12 @@ angular.module('SecurityGroupRules', ['CustomFilters', 'EucaConsoleUtils'])
             });
             // Modify Foundation Abide validation timeout
             setTimeout(function() {
-                $(document).foundation({abide : { timeout : 2000 } })
+                $(document).foundation({abide : { timeout : 2000 } });
             }, 500);
         };
         // In case of the duplicated rule, add the class 'disabled' to the submit button
         $scope.setAddRuleButtonClass = function () {
-            if( $scope.isRuleNotComplete == true || $scope.hasDuplicatedRule == true || $scope.customProtocolDivClass === 'error' ){
+            if( $scope.isRuleNotComplete === true || $scope.hasDuplicatedRule === true || $scope.customProtocolDivClass === 'error' ){
                 $scope.addRuleButtonClass = 'disabled';
             } else {
                 $scope.addRuleButtonClass = '';
@@ -256,15 +259,19 @@ angular.module('SecurityGroupRules', ['CustomFilters', 'EucaConsoleUtils'])
         $scope.checkRulesForDeletedSecurityGroups = function () {
             var invalidRulesArray = [];
             var invalidRulesEgressArray = [];
+            var internalRegexp = new RegExp("^euca-internal-\\d{12}-\\w*$");
             // Check the ingress rules
             angular.forEach($scope.rulesArray, function (rule) {
-                if (rule.grants[0].group_id != null) {
+                if (rule.grants[0].group_id !== null) {
                     var exists = false;
                     angular.forEach($scope.securityGroupList, function (sg) {
                         if (sg.id == rule.grants[0].group_id) {
                             exists = true;
                         } 
                     });
+                    if (internalRegexp.test(rule.grants[0].name)) {
+                        exists = true;
+                    }
                     if (!exists) {
                         invalidRulesArray.push(rule); 
                     }
@@ -272,7 +279,7 @@ angular.module('SecurityGroupRules', ['CustomFilters', 'EucaConsoleUtils'])
             });
             // Check the egress rules
             angular.forEach($scope.rulesEgressArray, function (rule) {
-                if (rule.grants[0].group_id != null) {
+                if (rule.grants[0].group_id !== null) {
                     var exists = false;
                     angular.forEach($scope.securityGroupList, function (sg) {
                         if (sg.id == rule.grants[0].group_id) {
@@ -319,11 +326,11 @@ angular.module('SecurityGroupRules', ['CustomFilters', 'EucaConsoleUtils'])
         //        if the rule has the granted gropu, compare that value instead. 
         $scope.compareRules = function(block1, block2){
             // IF the ports and the protocol are the same,
-            if( block1.from_port == block2.from_port
-                && block1.to_port == block2.to_port
-                && block1.ip_protocol == block2.ip_protocol){
+            if( block1.from_port == block2.from_port &&
+                block1.to_port == block2.to_port &&
+                block1.ip_protocol == block2.ip_protocol){
                 // IF cidr_ip is not null, then compare cidr_ip  
-                if( $scope.trafficType == "ip" && block1.grants[0].cidr_ip != null ){
+                if( $scope.trafficType == "ip" && block1.grants[0].cidr_ip !== null ){
                     if( block1.grants[0].cidr_ip == block2.grants[0].cidr_ip ){
                         // The rules are the same 
                         return true;
@@ -332,7 +339,7 @@ angular.module('SecurityGroupRules', ['CustomFilters', 'EucaConsoleUtils'])
                         return false;
                     }
                 // ELSE IF compare the group name
-                }else if( block1.grants[0].name != null ){
+                }else if( block1.grants[0].name !== null ){
                     if( block1.grants[0].name == block2.grants[0].name ){
                         // the rules are the same
                         return true;
@@ -360,11 +367,15 @@ angular.module('SecurityGroupRules', ['CustomFilters', 'EucaConsoleUtils'])
             if ($scope.selectedProtocol === 'icmp') {
                 $scope.fromPort = $scope.icmpRange;
                 $scope.toPort = $scope.icmpRange;
-                $scope.ipProtocol = 'icmp'
+                $scope.ipProtocol = 'icmp';
             } else if ($scope.selectedProtocol === 'udp') {
-                $scope.ipProtocol = 'udp'
+                $scope.ipProtocol = 'udp';
+            } else if ($scope.selectedProtocol === 'sctp') {
+                $scope.ipProtocol = 'sctp';
+                $scope.fromPort = null;
+                $scope.toPort = null;
             } else if ($scope.selectedProtocol === '-1') {
-                $scope.ipProtocol = '-1'
+                $scope.ipProtocol = '-1';
                 $scope.fromPort = null;
                 $scope.toPort = null;
             } else if ($scope.selectedProtocol === 'custom') {
@@ -377,12 +388,12 @@ angular.module('SecurityGroupRules', ['CustomFilters', 'EucaConsoleUtils'])
                 $scope.fromPort = null;
                 $scope.toPort = null;
             } else {
-                $scope.ipProtocol = 'tcp'
+                $scope.ipProtocol = 'tcp';
             }
         };
         // Create an array block that represents a new security group rule submiitted by user
         $scope.createRuleArrayBlock = function () {
-            var name = $scope.groupName ? $scope.trafficType == 'securitygroup' && $scope.groupName : null;
+            var name = $scope.trafficType == 'securitygroup' && $scope.groupName ? $scope.groupName : null;
             var owner_id = null;
             var group_id = null;
             if (name !== null) {
@@ -398,11 +409,11 @@ angular.module('SecurityGroupRules', ['CustomFilters', 'EucaConsoleUtils'])
             return {
                 'from_port': $scope.fromPort,
                 'to_port': $scope.toPort,
-                // Warning: Ugly hack to properly set ip_protocol when 'udp' or 'icmp'
+                // Warning: Ugly hack to properly set ip_protocol when 'udp', 'icmp' or 'sctp'
                 'ip_protocol': $scope.ipProtocol,
                 'custom_protocol': $scope.getCustomProtocolName($scope.customProtocol),
                 'grants': [{
-                    'cidr_ip': $scope.cidrIp ? $scope.trafficType == 'ip' && $scope.cidrIp : null,
+                    'cidr_ip': $scope.trafficType == 'ip' && $scope.cidrIp ? $scope.cidrIp : null,
                     'group_id': group_id,
                     'name': name,
                     'owner_id': owner_id
@@ -414,9 +425,9 @@ angular.module('SecurityGroupRules', ['CustomFilters', 'EucaConsoleUtils'])
         $scope.addRule = function ($event) {
             $event.preventDefault();
             $scope.checkRequiredInput();
-            if ($scope.isRuleNotComplete == true ||
-                $scope.hasDuplicatedRule == true ||
-                $scope.hasInvalidOwner == true) {
+            if ($scope.isRuleNotComplete === true ||
+                $scope.hasDuplicatedRule === true ||
+                $scope.hasInvalidOwner === true) {
                 return false;
             }
             // Trigger form validation to prevent borked rule entry
@@ -424,9 +435,9 @@ angular.module('SecurityGroupRules', ['CustomFilters', 'EucaConsoleUtils'])
             form.trigger('validate');
             // clear validation errors on hidden fields
             // TODO: retest without this code when foundation is upgraded beyond 5.0.3
-            $('.error.ng-hide').removeClass('error')
-            if ($scope.ipProtocol == 'icmp') {
-                $('.port').removeAttr('data-invalid')
+            $('.error.ng-hide').removeClass('error');
+            if ($scope.ipProtocol == 'icmp' || $scope.ipProtocol == 'sctp') {
+                $('.port').removeAttr('data-invalid');
             }
             if (form.find('[data-invalid]').length) {
                 return false;
@@ -483,8 +494,8 @@ angular.module('SecurityGroupRules', ['CustomFilters', 'EucaConsoleUtils'])
         };
         $scope.getGroupIdByName = function (name) {
             for( var i=0; i < $scope.securityGroupList.length; i++){
-                if ($scope.securityGroupList[i]['name'] === name) {
-                    return $scope.securityGroupList[i]['id'];
+                if ($scope.securityGroupList[i].name === name) {
+                    return $scope.securityGroupList[i].id;
                 }
             } 
             return null;
@@ -528,10 +539,12 @@ angular.module('SecurityGroupRules', ['CustomFilters', 'EucaConsoleUtils'])
         };
         $scope.adjustIPProtocolOptions = function () {
             $scope.removeAllTrafficRuleOption();
+            $scope.removeSCTPProtocolRuleOption();
             $scope.removeCustomProtocolRuleOption();
-            if ($scope.securityGroupVPC != 'None') {
+            if (['None', ''].indexOf($scope.securityGroupVPC) === -1) {
                 // Allow All Traffic and Custom Protocol options to be selectable for VPC
                 $scope.insertAllTrafficRuleOption();
+                $scope.insertSCTPProtocolRuleOption(); 
                 $scope.insertCustomProtocolRuleOption(); 
             }
             $('#ip-protocol-select').prop('selectedIndex', -1);
@@ -540,6 +553,10 @@ angular.module('SecurityGroupRules', ['CustomFilters', 'EucaConsoleUtils'])
         // Remove All Traffic rule, "-1 ()" from the option
         $scope.removeAllTrafficRuleOption  = function () {
             $('#ip-protocol-select').find("option[value='-1']").remove();
+        };
+        // Remove SCTP Protocol rule from the option
+        $scope.removeSCTPProtocolRuleOption  = function () {
+            $("#ip-protocol-select option[value='sctp']").remove();
         };
         // Remove Custom Protocol rule, "custom" from the option
         $scope.removeCustomProtocolRuleOption  = function () {
@@ -550,6 +567,12 @@ angular.module('SecurityGroupRules', ['CustomFilters', 'EucaConsoleUtils'])
             var key = "-1";
             var value = $('#all-traffic-option-text').text();
             $('#ip-protocol-select').prepend($("<option></option>").attr("value", key).text(value));  
+        };
+        // Allow SCTP protocol, to be selectable in many (but not all) cases
+        $scope.insertSCTPProtocolRuleOption  = function () {
+            var key = "sctp";
+            var value = $('#sctp-protocol-option-text').text();
+            $('#ip-protocol-select').append($("<option></option>").attr("value", key).text(value));  
         };
         // Allow Custom protocol, "custom", to be selectable for VPC
         $scope.insertCustomProtocolRuleOption  = function () {
@@ -585,14 +608,14 @@ angular.module('SecurityGroupRules', ['CustomFilters', 'EucaConsoleUtils'])
         $scope.verifyCustomProtocol = function () {
             if (isNaN($scope.customProtocol)) {
                 // if customProtocol is not a number
-                if ($scope.getCustomProtocolNumber($scope.customProtocol) != '') {
+                if ($scope.getCustomProtocolNumber($scope.customProtocol) !== '') {
                     return true;
                 } else {
                     return false;
                 }
             } else {
                 // if customProtocol is a number
-                if ($scope.getCustomProtocolName($scope.customProtocol) != undefined) {
+                if ($scope.getCustomProtocolName($scope.customProtocol) !== undefined) {
                     return true;
                 } else {
                     return false;

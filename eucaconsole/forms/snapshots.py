@@ -1,4 +1,4 @@
-# Copyright 2013-2014 Eucalyptus Systems, Inc.
+# Copyright 2013-2015 Hewlett Packard Enterprise Development LP
 #
 # Redistribution and use of this software in source and binary forms,
 # with or without modification, are permitted provided that the following
@@ -43,7 +43,7 @@ class SnapshotForm(BaseSecureForm):
     volume_error_msg = _(u'Volume is required')
     volume_id = wtforms.SelectField(
         label=_(u'Create from volume'),
-        validators=[validators.DataRequired(message=volume_error_msg),],
+        validators=[validators.DataRequired(message=volume_error_msg)],
     )
     desc_error_msg = _(u'Description is required')
     description = wtforms.TextAreaField(
@@ -109,11 +109,14 @@ class SnapshotsFiltersForm(BaseSecureForm):
         super(SnapshotsFiltersForm, self).__init__(request, **kwargs)
         self.request = request
         self.status.choices = self.get_status_choices()
+        self.facets = [
+            {'name': 'status', 'label': self.status.label.text, 'options': self.get_status_choices()},
+        ]
 
     @staticmethod
     def get_status_choices():
-        return (
-            ('pending', 'In progress'),
-            ('completed', 'Completed'),
-        )
+        return [
+            {'key': 'pending', 'label': _(u'In progress')},
+            {'key': 'completed', 'label': _(u'Completed')},
+        ]
 

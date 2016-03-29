@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2013-2014 Eucalyptus Systems, Inc.
+# Copyright 2013-2015 Hewlett Packard Enterprise Development LP
 #
 # Redistribution and use of this software in source and binary forms,
 # with or without modification, are permitted provided that the following
@@ -25,7 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 """
-Forms for Groups 
+Forms for Groups
 
 """
 import wtforms
@@ -33,6 +33,7 @@ from wtforms import validators
 
 from ..i18n import _
 from . import BaseSecureForm, TextEscapedField
+
 
 class GroupForm(BaseSecureForm):
     """Group form

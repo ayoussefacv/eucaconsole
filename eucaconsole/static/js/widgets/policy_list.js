@@ -3,8 +3,8 @@
  * @requires AngularJS
  *
  */
-angular.module('PolicyList', [])
-    .controller('PolicyListCtrl', function ($scope, $http, $rootScope) {
+angular.module('PolicyList', ['EucaConsoleUtils'])
+    .controller('PolicyListCtrl', function ($scope, $http, $rootScope, eucaHandleError, eucaHandleErrorNoNotify) {
         $http.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
         $scope.policyList = $('#policy-list');
         $scope.itemsLoading = true;
@@ -49,9 +49,8 @@ angular.module('PolicyList', [])
                 $scope.syncPolicies();
               }
             ).error(function (oData, status) {
-                var errorMsg = oData['message'] || '';
                 $scope.itemsLoading = false;
-                Notify.failure(errorMsg);
+                eucaHandleErrorNoNotify(oData, status);
             });
         };
         $rootScope.getPolicies = function() {
@@ -85,7 +84,7 @@ angular.module('PolicyList', [])
                 $scope.syncPolicies();
                 Notify.success(oData.message);
             }).error(function (oData) {
-                var errorMsg = oData['message'] || '';
+                var errorMsg = oData.message || '';
                 Notify.failure(errorMsg);
             });
             $('#delete-modal').foundation('reveal', 'close');
@@ -98,7 +97,7 @@ angular.module('PolicyList', [])
             $event.preventDefault();
             $scope.clearCodeEditor();
             $scope.editPolicyModal.foundation('reveal', 'open');
-            $scope.editPolicyModal.on('close', function() {
+            $scope.editPolicyModal.on('close.fndtn.reveal', function() {
                 $scope.clearCodeEditor();
             });
             $scope.policyJson = ''; // clear any previous policy
@@ -110,10 +109,7 @@ angular.module('PolicyList', [])
                 $scope.codeEditor.setValue(results);
                 $scope.codeEditor.focus();
             }).error(function (oData, status) {
-                var errorMsg = oData['message'] || '';
-                if (errorMsg && status === 403) {
-                    $('#timed-out-modal').foundation('reveal', 'open');
-                }
+                eucaHandleError(oData, status);
             });
         };
         $scope.savePolicy = function($event) {
@@ -133,7 +129,7 @@ angular.module('PolicyList', [])
                 ).success(function(oData) {
                     Notify.success(oData.message);
                 }).error(function (oData) {
-                    var errorMsg = oData['message'] || '';
+                    var errorMsg = oData.message || '';
                     Notify.failure(errorMsg);
                 });
             } catch (e) {

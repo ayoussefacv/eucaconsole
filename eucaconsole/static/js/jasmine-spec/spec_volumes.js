@@ -24,7 +24,7 @@ describe("VolumesPage", function() {
         var template = window.__html__['templates/volumes/volumes.pt'];
         // remove <script src> and <link> tags to avoid phantomJS error
         template = template.replace(/script src/g, "script ignore_src"); 
-        template = template.replace(/\<link/g, "\<ignore_link"); 
+        template = template.replace(/<link/g, "<ignore_link"); 
         setFixtures(template);
     });
 
@@ -51,11 +51,11 @@ describe("VolumesPage", function() {
         });
     });
 
-    describe("Function initPage() Test", function() {
+    describe("Function initController() Test", function() {
 
-        it("Should set instanceByZone when initPage() is called", function() {
-            scope.initPage('zone');
-            expect(scope.instancesByZone).toEqual('zone');
+        it("Should set instanceByZone when initcontroller() is called", function() {
+            scope.initController('{"instances_by_zone": {"zone": "zone"}}');
+            expect(scope.instancesByZone.zone).toEqual('zone');
         });
     });
 
@@ -70,22 +70,17 @@ describe("VolumesPage", function() {
             scope.revealModal('a', {name: "vol"});
             expect(scope.volumeName).toEqual('vol');
         });
-
-        it("Should set instanceName when revealModal() is called and action is detach", function() {
-            scope.revealModal('detach', {instance_name: "inst"});
-            expect(scope.instanceName).toEqual('inst');
-        });
     });
 
     describe("Function detachModal() Test", function() {
 
         it("Should set volumeID when detachModal() is called", function() {
-            scope.detachModal({id: "v-12345678"}, 'url');
+            scope.detachModal({id: "v-12345678"});
             expect(scope.volumeID).toEqual('v-12345678');
         });
 
         it("Should set instanceName when revealModal() is called", function() {
-            scope.detachModal({instance_name: "inst"}, 'url');
+            scope.detachModal({instance_name: "inst"});
             expect(scope.instanceName).toEqual('inst');
         });
     });

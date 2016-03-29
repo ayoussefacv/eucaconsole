@@ -1,4 +1,5 @@
-# Copyright 2013-2014 Eucalyptus Systems, Inc.
+# -*- coding: utf-8 -*-
+# Copyright 2013-2015 Hewlett Packard Enterprise Development LP
 #
 # Redistribution and use of this software in source and binary forms,
 # with or without modification, are permitted provided that the following
@@ -29,6 +30,7 @@ Pyramid configuration helpers
 """
 
 import boto
+import json
 import logging
 import os
 import sys
@@ -38,9 +40,6 @@ from pyramid.authentication import SessionAuthenticationPolicy
 from pyramid.authorization import ACLAuthorizationPolicy
 from pyramid.events import BeforeRender
 from pyramid.settings import asbool
-
-from dogpile.cache import make_region
-from dogpile.cache.util import sha1_mangle_key
 
 from .i18n import custom_locale_negotiator
 from .models import SiteRootFactory
@@ -62,11 +61,12 @@ except ImportError:
     __version__ = 'DEVELOPMENT'
 
 REQUIRED_CONFIG = {
-    #'use': 'egg:eucaconsole',  # can't test for this since container strips it
+    # 'use': 'egg:eucaconsole',  # can't test for this since container strips it
     'pyramid.includes': ['pyramid_beaker', 'pyramid_chameleon', 'pyramid_layout'],
     'session.type': 'cookie',
     'cache.memory': 'dogpile.cache.pylibmc'
 }
+
 
 def check_config(settings):
     # check for required config first
@@ -84,13 +84,33 @@ def check_config(settings):
             if is_list:
                 value = '\n'.join(value)
             logging.error("*****************************************************************")
-            logging.error(" Required configuration value {0} = {1} not found in console.ini".format(key, value))
+            logging.error(u" Required configuration value {0} = {1} not found in console.ini".format(key, value))
             logging.error(" Please correct this and restart eucaconsole.")
             logging.error("*****************************************************************")
             sys.exit(1)
+    if not settings.get('ufshost'):
+        logging.warn(
+            "'clchost' and 'clcport' are deprecated in Eucalyptus version 4.2.0 and "
+            "will be removed in version 4.3.0. Use 'ufshost' and 'ufsport' instead."
+        )
+    bad_hosts = ['localhost', '127.0.0.1']
+    if settings.get('ufshost') in bad_hosts or settings.get('clchost') in bad_hosts:
+        logging.warn(
+            "'ufshost' needs to be set to something externally resolvable."
+            "Stack creation and object download will not work properly until this is fixed."
+        )
+
+
+def write_routes_json(path):
+    url_dict = {}
+    for url in urls:
+        url_dict[url.name] = url.pattern.replace('{', '{{').replace('}', '}}')
+    with open(os.path.join(path, 'routes.json'), 'w') as outfile:
+        json.dump(url_dict, outfile)
+
 
 def get_configurator(settings, enable_auth=True):
-    check_config(settings);
+    check_config(settings)
     connection_debug = asbool(settings.get('connection.debug'))
     boto.set_stream_logger('boto', level=(logging.DEBUG if connection_debug else logging.CRITICAL))
     ensure_session_keys(settings)
@@ -108,16 +128,26 @@ def get_configurator(settings, enable_auth=True):
     config.add_static_view(name='static/' + __version__, path='static', cache_max_age=cache_duration)
     config.add_layout('eucaconsole.layout.MasterLayout',
                       'eucaconsole.layout:templates/master_layout.pt')
+
+    route_dir = os.path.join(os.getcwd(), 'run')
+    if not os.path.exists(route_dir) and os.path.exists('/var/run/eucaconsole'):
+        route_dir = '/var/run/eucaconsole'
+    write_routes_json(route_dir)
+    config.add_static_view(name='static/json', path=route_dir, cache_max_age=cache_duration)
+
     locale_dir = os.path.join(os.getcwd(), 'locale')
     # use local locale directory over system one
     if not os.path.exists(locale_dir) and os.path.exists('/usr/share/locale'):
         locale_dir = '/usr/share/locale'
     config.add_translation_dirs(locale_dir)
     config.set_locale_negotiator(custom_locale_negotiator)
+
     for route in urls:
         config.add_route(route.name, route.pattern)
-    setup_tweens(config)
-    config.scan()
+
+    setup_tweens(config, settings)
+    config.scan('.views')
+
     if not boto.config.has_section('Boto'):
         boto.config.add_section('Boto')
     boto.config.set('Boto', 'num_retries', settings.get('connection.retries', '2'))
@@ -128,53 +158,54 @@ def get_configurator(settings, enable_auth=True):
     password = settings.get('cache.password', None)
     short_term.configure(
         memory_cache,
-        expiration_time = int(settings.get('cache.short_term.expire')),
-        arguments = {
-            'url':[memory_cache_url],
-            'binary':True,
-            'min_compress_len':1024,
-            'behaviors':{"tcp_nodelay": True,"ketama":True},
-            'username':username,
-            'password':password
+        expiration_time=int(settings.get('cache.short_term.expire')),
+        arguments={
+            'url': [memory_cache_url],
+            'binary': True,
+            'min_compress_len': 1024,
+            'behaviors': {"tcp_nodelay": True, "ketama": True},
+            'username': username,
+            'password': password
         },
     )
     default_term.configure(
         memory_cache,
-        expiration_time = int(settings.get('cache.default_term.expire')),
-        arguments = {
-            'url':[memory_cache_url],
-            'binary':True,
-            'min_compress_len':1024,
-            'behaviors':{"tcp_nodelay": True,"ketama":True},
-            'username':username,
-            'password':password
+        expiration_time=int(settings.get('cache.default_term.expire')),
+        arguments={
+            'url': [memory_cache_url],
+            'binary': True,
+            'min_compress_len': 1024,
+            'behaviors': {"tcp_nodelay": True, "ketama": True},
+            'username': username,
+            'password': password
         },
     )
     long_term.configure(
         memory_cache,
-        expiration_time = int(settings.get('cache.long_term.expire')),
-        arguments = {
-            'url':[memory_cache_url],
-            'binary':True,
-            'min_compress_len':1024,
-            'behaviors':{"tcp_nodelay": True,"ketama":True},
-            'username':username,
-            'password':password
+        expiration_time=int(settings.get('cache.long_term.expire')),
+        arguments={
+            'url': [memory_cache_url],
+            'binary': True,
+            'min_compress_len': 1024,
+            'behaviors': {"tcp_nodelay": True, "ketama": True},
+            'username': username,
+            'password': password
         },
     )
     extra_long_term.configure(
         memory_cache,
-        expiration_time = int(settings.get('cache.extra_long_term.expire')),
-        arguments = {
-            'url':[memory_cache_url],
-            'binary':True,
-            'min_compress_len':1024,
-            'behaviors':{"tcp_nodelay": True,"ketama":True},
-            'username':username,
-            'password':password
+        expiration_time=int(settings.get('cache.extra_long_term.expire')),
+        arguments={
+            'url': [memory_cache_url],
+            'binary': True,
+            'min_compress_len': 1024,
+            'behaviors': {"tcp_nodelay": True, "ketama": True},
+            'username': username,
+            'password': password
         },
     )
     return config
+
 
 def main(global_config, **settings):
     """

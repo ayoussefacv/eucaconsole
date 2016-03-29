@@ -27,29 +27,29 @@
                     <dl id="wizard-tabs" class="tabs" data-tab="">
                         <dd class="${'active' if not image else ''}">
                             <a id="tabStep1" ng-click="visitNextStep(1, $event)" href="#step1">
-                                <span class="cir">1</span> <b>Image</b>
+                                <span class="cir">1</span> <b i18n:translate="">Image</b>
                             </a>
                         </dd>
                         <dd ng-class="{disabled: step1Invalid}">
                             <a id="tabStep2" ng-click="visitNextStep(2, $event)"
                                href="#step2" ng-cloak="" ng-if="!step1Invalid">
-                                <span class="cir">2</span> <b>Details</b>
+                                <span class="cir">2</span> <b i18n:translate="">Details</b>
                             </a>
-                            <span class="cir" ng-cloak="" ng-if="step1Invalid">2</span> <b ng-cloak="" ng-if="step1Invalid">Details</b>
+                            <span class="cir" ng-cloak="" ng-if="step1Invalid">2</span> <b ng-cloak="" ng-if="step1Invalid" i18n:translate="">Details</b>
                         </dd>
                         <dd ng-class="{disabled: step2Invalid}">
                             <a id="tabStep3" ng-click="visitNextStep(3, $event)"
                                href="#step3" ng-cloak="" ng-if="!step2Invalid">
-                                <span class="cir">3</span> <b>Security</b>
+                                <span class="cir">3</span> <b i18n:translate="">Security</b>
                             </a>
-                            <span class="cir" ng-cloak="" ng-if="step2Invalid">3</span> <b ng-cloak="" ng-if="step2Invalid">Security</b>
+                            <span class="cir" ng-cloak="" ng-if="step2Invalid">3</span> <b ng-cloak="" ng-if="step2Invalid" i18n:translate="">Security</b>
                         </dd>
                         <dd ng-class="{disabled: step3Invalid}">
                             <a id="tabStep4" ng-click="visitNextStep(4, $event)"
                                href="#step4" ng-cloak="" ng-if="!step3Invalid">
-                                <span class="cir">4</span> <b>Advanced</b>
+                                <span class="cir">4</span> <b i18n:translate="">Advanced</b>
                             </a>
-                            <span class="cir" ng-cloak="" ng-if="step3Invalid">4</span> <b ng-cloak="" ng-if="step3Invalid">Advanced</b>
+                            <span class="cir" ng-cloak="" ng-if="step3Invalid">4</span> <b ng-cloak="" ng-if="step3Invalid" i18n:translate="">Advanced</b>
                         </dd>
                     </dl>
                     <div class="tabs-content">
@@ -62,24 +62,44 @@
                             <p class="description" i18n:translate="">
                                 Specify the number, name(s), size, availability zone, and tags.
                             </p>
-                            ${panel('form_field', field=launch_form['number'], leftcol_width=3, rightcol_width=9, min=1, max=10, maxlength=2, ng_attrs={'model': 'instanceNumber'}, pattern=layout.integer_gt_zero_pattern)}
+                            ${panel('form_field', field=launch_form['number'], leftcol_width=3, rightcol_width=9, leftcol_width_large=3, rightcol_width_large=9, min=1, max=10, maxlength=2, ng_attrs={'model': 'instanceNumber'}, pattern=layout.integer_gt_zero_pattern)}
                             <div class="row controls-wrapper" ng-cloak="">
-                                <div class="small-3 columns">
-                                    <label>
+                                <div class="large-3 small-3 columns">
+                                    <label class="right">
                                         <span i18n:translate="">Name</span><span ng-show="instanceNumber > 1">s</span>
                                     </label>
                                 </div>
-                                <div class="small-9 columns field inline">
+                                <div class="large-9 small-9 columns field inline">
                                     <span ng-repeat="name in buildNumberList()">
-                                        <input class="name" placeholder="instance{{ $index + 1 }}"
+                                        <input type="text" class="name" placeholder="instance{{ $index + 1 }}"
                                                name="name_{{ $index }}" ng-model="instanceNames[$index]" />
                                     </span>
                                 </div>
                             </div>
-                            ${panel('form_field', field=launch_form['instance_type'], leftcol_width=3, rightcol_width=9, ng_attrs={'model': 'instanceType'})}
-                            ${panel('form_field', field=launch_form['zone'], leftcol_width=3, rightcol_width=9, ng_attrs={'model': 'instanceZone'})}
+                            ${panel('form_field', field=launch_form['instance_type'], leftcol_width=3, rightcol_width=9, leftcol_width_large=3, rightcol_width_large=9, ng_attrs={'model': 'instanceType'})}
+                            ${panel('form_field', field=launch_form['zone'], leftcol_width=3, rightcol_width=9, leftcol_width_large=3, rightcol_width_large=9, ng_attrs={'model': 'instanceZone'})}
                             <hr />
                             ${panel('tag_editor', show_name_tag=False, leftcol_width=3, rightcol_width=9)}
+                            <hr />
+                            <div class="row controls-wrapper readonly">
+                                <div class="columns">
+                                    <h6 i18n:translate="">User data</h6>
+                                </div>
+                                <div class="small-12 columns value">
+                                    <input type="radio" id="inputtype" name="inputtype" value="text" ng-model="inputtype"/>
+                                    <label class="userdatalabel" i18n:translate="">Enter text</label>
+                                    <textarea id="userdata" name="userdata"
+                                              ng-model="userData" ng-show="inputtype=='text'" maxlength="16384"></textarea>
+                                    <br/>
+                                    <input type="radio" id="inputtype" name="inputtype" value="file" ng-model="inputtype"/>
+                                    <label class="userdatalabel">
+                                        <span i18n:translate="">Upload file</span>
+                                        <span tal:condition="getattr(launch_form.userdata_file, 'help_text', None)" class="helptext-icon"
+                                            data-tooltip="" title="${launch_form.userdata_file.help_text}"></span>
+                                    </label>
+                                    <input id="userdata_file" type="file" ng-model="userDataFile" ng-disabled="isNotStopped" name="userdata_file" disabled="disabled" ng-show="inputtype=='file'"/><span id="userdatatype"></span>
+                                </div>
+                            </div>
                             <hr />
                             <div>
                                 <label>
@@ -107,35 +127,35 @@
                                 <p class="description" i18n:translate="">Specify key pair and security group.</p>
                             </div>
                             <div tal:condition="is_vpc_supported">
-                                ${panel('form_field', field=launch_form['vpc_network'], ng_attrs={'model': 'instanceVPC'}, leftcol_width=4, rightcol_width=8)}
+                                ${panel('form_field', field=launch_form['vpc_network'], ng_attrs={'model': 'instanceVPC'}, leftcol_width=4, rightcol_width=8, leftcol_width_large=4, rightcol_width_large=8)}
                                 <div ng-show="instanceVPC != 'None'">
-                                    ${panel('form_field', field=launch_form['vpc_subnet'], leftcol_width=4, rightcol_width=8, ng_attrs={'model': 'subnetVPC', 'options': 'k as v for (k, v) in vpcSubnetChoices'})}
+                                    ${panel('form_field', field=launch_form['vpc_subnet'], leftcol_width_large=4, rightcol_width_large=8, ng_attrs={'model': 'subnetVPC', 'options': 'k as v for (k, v) in vpcSubnetChoices'})}
                                     <span id="hidden_vpc_subnet_empty_option" class="hide" i18n:translate="">No subnets found</span>
-                                    ${panel('form_field', field=launch_form['associate_public_ip_address'], leftcol_width=4, rightcol_width=8)}
+                                    ${panel('form_field', field=launch_form['associate_public_ip_address'], leftcol_width_large=4, rightcol_width_large=8)}
                                 </div>
                             </div>
-                            ${panel('form_field', field=launch_form['keypair'], leftcol_width=4, rightcol_width=8, ng_attrs={'model': 'keyPair', 'options': 'k as v for (k, v) in keyPairChoices'})}
+                            ${panel('form_field', field=launch_form['keypair'], leftcol_width=4, rightcol_width=8, leftcol_width_large=4, rightcol_width_large=8, ng_attrs={'model': 'keyPair', 'options': 'k as v for (k, v) in keyPairChoices'})}
                             <div class="row">
-                                <div class="small-8 columns right" id="create-keypair-link">
+                                <div class="large-8 small-8 columns right" id="create-keypair-link">
                                     <span class="or" i18n:translate="">Or: </span>
                                     <a ng-click="showCreateKeypairModal()" i18n:translate="">Create key pair</a>
                                 </div>
                             </div>
-                            ${panel('form_field', field=launch_form['securitygroup'], leftcol_width=4, rightcol_width=8, ng_attrs={'model': 'securityGroups', 'options': 'k as v for (k, v) in securityGroupChoices'}, **security_group_attrs)}
+                            ${panel('form_field', field=launch_form['securitygroup'], leftcol_width=4, rightcol_width=8, leftcol_width_large=4, rightcol_width_large=8, ng_attrs={'model': 'securityGroups', 'options': 'k as v for (k, v) in securityGroupChoices'}, **security_group_attrs)}
                             <div class="row">
-                                <div class="small-8 columns right" id="create-securitygroup-link">
+                                <div class="large-8 small-8 columns right" id="create-securitygroup-link">
                                     <span class="or" i18n:translate="">Or: </span>
                                     <a data-reveal-id="create-securitygroup-modal" i18n:translate="">Create security group</a>
                                 </div>
                             </div>
-                            ${panel('securitygroup_rules_preview', leftcol_width=4, rightcol_width=8)}
+                            ${panel('securitygroup_rules_preview', leftcol_width=4, rightcol_width=8, leftcol_width_large=4, rightcol_width_large=8)}
                             <hr />
                             <p class="description" i18n:translate="">Specify an IAM role if you would like to give this instance special access privileges.</p>
                             <div class="row">
-                                <div class="small-4 columns">
+                                <div class="large-4 small-4 columns">
                                     <label class="right" i18n:translate="">Role</label>
                                 </div>
-                                <div class="small-8 columns field">
+                                <div class="large-8 small-8 columns field">
                                     <select id="role" ng-options="k as v for (k, v) in roleList" ng-model="role" name="role"></select>
                                 </div>
                             </div>
@@ -147,8 +167,8 @@
                                 </label>
                             </div>
                             <div class="row">
-                                <div class="small-4 columns">&nbsp;</div>
-                                <div class="small-8 columns field inline">
+                                <div class="large-4 small-4 columns">&nbsp;</div>
+                                <div class="large-8 small-8 columns field inline">
                                     <button type="submit" class="button" ng-click="saveOptions()" id="launch-instance-btn-step3" ng-disabled="isNotValid">
                                         <span i18n:translate="">Launch Instance<span ng-show="instanceNumber > 1">s</span></span>
                                     </button>
@@ -163,41 +183,26 @@
                         </div>
                         <!--! Step 4: Advanced tab content -->
                         <div class="content" id="step4">
-                            <p class="description" i18n:translate="">
-                                User data and other advanced options (optional).
-                            </p>
-                            <div class="row controls-wrapper readonly">
-                                <div class="small-4 columns">
-                                    <label i18n:translate="">User data<span class="helptext-icon" title="User data file may not exceed 16 KB" data-tooltip="">?</span></label>
-                                </div>
-                                <div class="small-8 columns value">
-                                    <input type="radio" id="inputtype" name="inputtype" value="text" ng-model="inputtype">
-                                        <label id='userdatalabel' i18n:translate="">Enter text</label>
-                                    </input>
-                                    <textarea id="userdata" name="userdata" ng-show="inputtype=='text'"></textarea>
-                                    <br/>
-                                    <input type="radio" id="inputtype" name="inputtype" value="file" ng-model="inputtype">
-                                        <label id='userdatalabel' i18n:translate="">Upload file</label>
-                                    </input>
-                                    <input id="userdata_file" type="file" ng-model="userDataFile" ng-disabled="isNotStopped" name="userdata_file" disabled="disabled" ng-show="inputtype=='file'"></input><span id="userdatatype"></span>
-                                    
+                            ${panel('form_field', field=launch_form['kernel_id'], leftcol_width_large=3, rightcol_width_large=9)}
+                            ${panel('form_field', field=launch_form['ramdisk_id'], leftcol_width_large=3, rightcol_width_large=9)}
+                            <div class="row inline controls-wrapper" id="controls_monitoring_enabled">
+                                <div class="large-9 small-8 columns right">
+                                    ${structure:launch_form.monitoring_enabled(**{'ng-model': 'monitoringEnabled'})}
+                                    ${launch_form['monitoring_enabled'].label}
+                                    <span data-tooltip="" title="${launch_form.monitoring_enabled.help_text}">
+                                        <i class="helptext-icon"></i>
+                                    </span>
                                 </div>
                             </div>
-                            ${panel('form_field', field=launch_form['kernel_id'])}
-                            ${panel('form_field', field=launch_form['ramdisk_id'])}
-                            <div class="small-8 columns right">
-                                ${structure:launch_form.monitoring_enabled(**{'ng-model': 'monitoringEnabled'})}
-                                ${launch_form['monitoring_enabled'].label}
-                            </div>
-                            <div class="small-8 columns right" tal:condition="layout.cloud_type == 'euca' and not is_vpc_supported">
+                            <div class="large-9 small-8 columns right" tal:condition="layout.cloud_type == 'euca' and not is_vpc_supported">
                                 ${structure:launch_form.private_addressing(**{'ng-model': 'privateAddressing'})}
                                 ${launch_form['private_addressing'].label}
                             </div>
                             <hr/>
-                            ${panel('bdmapping_editor', image=image, snapshot_choices=snapshot_choices)}
+                            ${panel('bdmapping_editor', image=image, snapshot_choices=snapshot_choices, add_hr=True)}
                             <div class="row">
-                                <div class="small-4 columns">&nbsp;</div>
-                                <div class="small-8 columns field inline">
+                                <div class="large-3 small-4 columns">&nbsp;</div>
+                                <div class="large-9 small-8 columns field inline">
                                     <button type="submit" class="button" ng-click="saveOptions()" id="launch-instance-btn-step4" ng-disabled="isNotValid">
                                         <span i18n:translate="">Launch Instance</span><span ng-show="instanceNumber > 1">s</span>
                                     </button>
@@ -209,6 +214,24 @@
                     </div>
                     <div class="clearfix">&nbsp;</div>
                 </form>
+                <div class="">
+                    <metal:block metal:use-macro="layout.global_macros['help_expando']" />
+                    <div class="help-content" ng-show="isHelpExpanded" ng-cloak="">
+                        <!-- HELP CONTENT -->
+                        <div id="help-html-console_create_instance_image" ng-show="currentStepIndex == 1"
+                            ng-include="'${layout.help_path('console_create_instances_image.html')}'">
+                        </div> 
+                        <div id="help-html-console_create_instance_details" ng-show="currentStepIndex == 2"
+                            ng-include="'${layout.help_path('console_create_instances_details.html')}'">
+                        </div> 
+                        <div id="help-html-console_create_instance_security" ng-show="currentStepIndex == 3"
+                            ng-include="'${layout.help_path('console_create_instances_security.html')}'">
+                        </div> 
+                        <div id="help-html-console_create_instance_advanced" ng-show="currentStepIndex == 4"
+                            ng-include="'${layout.help_path('console_create_instances_advanced.html')}'">
+                        </div> 
+                    </div>
+                </div>
             </div>
         </div>
         <div class="large-4 columns" ng-cloak="">
@@ -217,93 +240,92 @@
                 <h5 i18n:translate="" class="title">Summary</h5>
                 <div class="section step1 hide">
                     <div class="row">
-                        <label i18n:translate="">Image:</label>
+                        <label i18n:translate="">Image</label>
                         <div class="columns value">{{ imageName }}</div>
                     </div>
                     <div class="row">
-                        <label i18n:translate="">Platform:</label>
+                        <label i18n:translate="">Platform</label>
                         <div class="columns value">{{ imagePlatform }}</div>
                     </div>
                     <div class="row">
-                        <label i18n:translate="">Root device:</label>
+                        <label i18n:translate="">Root device</label>
                         <div class="columns value">{{ imageRootDeviceType }}</div>
                     </div>
                 </div>
                 <div class="section step2 ${'hide' if not image else ''}">
                     <div class="row">
-                        <label i18n:translate="">Size:</label>
+                        <label i18n:translate="">Size</label>
                         <div class="columns value">{{ instanceType }}</div>
                     </div>
                     <div class="row">
-                        <label i18n:translate="">Number:</label>
+                        <label i18n:translate="">Number</label>
                         <div class="columns value">{{ instanceNumber }}</div>
                     </div>
                     <div class="row">
-                        <label i18n:translate="">Zone:</label>
+                        <label i18n:translate="">Zone</label>
                         <div class="columns value">{{ instanceZone || 'no preference' }}</div>
                     </div>
                     <div class="row">
-                        <label i18n:translate="">Names:</label>
-                        <div class="columns value">
+                        <label i18n:translate="">Name(s)</label>
+                        <div class="columns value breakword">
                             <span ng-repeat="instanceName in instanceNames">
                                 {{ instanceName }}<span ng-show="!$last">, </span>
                             </span>
                         </div>
                     </div>
-                    <div class="row">
-                        <label i18n:translate="">Tags:</label>
+                    <div class="row" ng-show="tagsLength &gt; 0">
+                        <label i18n:translate="">Tags</label>
                         <div class="columns value" id="tag-preview">
                             <div ng-repeat="(name, value) in tagsObject">{{ name }}={{ value }}</div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="columns value" ng-show="userData || userDataFile">
+                            <br/>
+                            <i class="fi-check"></i> User data added
                         </div>
                     </div>
                 </div>
                 <div class="section step3 hide">
                     <div class="row" ng-show="instanceVPC != ''">
-                        <label i18n:translate="">Network:</label>
+                        <label i18n:translate="">Network</label>
                         <div class="columns value">{{ instanceVPCName }}</div>
                     </div>
                     <div class="row" ng-show="instanceVPC != ''">
-                        <label i18n:translate="">Subnet:</label>
+                        <label i18n:translate="">Subnet</label>
                         <div class="columns value">{{ vpcSubnetChoices[subnetVPC] }}</div>
                     </div>
                     <div class="row">
-                        <label i18n:translate="">Key:</label>
-                        <div class="columns value">{{ keyPair }}</div>
+                        <label i18n:translate="">Key</label>
+                        <div class="columns value breakword">{{ keyPair }}</div>
                     </div>
                     <div class="row">
-                        <label i18n:translate="">Security group:</label>
-                        <div class="columns value" ng-repeat="sgroup in securityGroups">
+                        <label i18n:translate="">Security group</label>
+                        <div class="columns value breakword" ng-repeat="sgroup in securityGroups">
                             {{ securityGroupChoices[sgroup] }}
                         </div>
                     </div>
                     <div class="row" ng-show="role">
-                        <label i18n:translate="">Role:</label>
+                        <label i18n:translate="">Role</label>
                         <div class="columns value">{{ role }}</div>
                     </div>
                 </div>
                 <div class="section step4 hide">
                     <div class="row">
-                        <div class="columns value" ng-show="userData || userDataFile">
-                            <i class="fi-check"></i> User data added
-                        </div>
-                    </div>
-                    <div class="row">
                         <div class="columns value" ng-show="monitoringEnabled">
-                            <i class="fi-check"></i> Monitoring enabled
+                            <i class="fi-check"></i> <span i18n:translate="">Monitoring enabled</span>
                         </div>
                     </div>
                     <div class="row">
                         <div class="columns value" ng-show="privateAddressing">
-                            <i class="fi-check"></i> Uses private addressing
+                            <i class="fi-check"></i> <span i18n:translate="">Uses private addressing</span>
                         </div>
                     </div>
-                </div>
-            </div>
-            <div class="">
-                <metal:block metal:use-macro="layout.global_macros['help_expando']" />
-                <div class="help-content" ng-show="isHelpExpanded" ng-cloak="">
-                    <!-- HELP CONTENT -->
-                    <div id="help-html-console_create_instances" ng-include="'${layout.help_path('console_create_instances.html')}'"></div> 
+                    <div class="row">
+                        <div class="columns value" ng-show="additionalStorageConfigured">
+                            <i class="fi-check"></i> <span i18n:translate="">Additional storage configured</span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

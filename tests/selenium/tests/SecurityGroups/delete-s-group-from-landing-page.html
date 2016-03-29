@@ -18,22 +18,12 @@
 </tr>
 <tr>
 	<td>waitForVisible</td>
-	<td>id=resource-menu-dashboard</td>
+	<td>id=resource-menuitem-dashboard</td>
 	<td></td>
 </tr>
 <tr>
 	<td>click</td>
-	<td>id=resource-menu-dashboard</td>
-	<td></td>
-</tr>
-<tr>
-	<td>assertVisible</td>
-	<td>id=resource-menu-netsec</td>
-	<td></td>
-</tr>
-<tr>
-	<td>click</td>
-	<td>id=resource-menu-netsec</td>
+	<td>id=offcanvas-icon</td>
 	<td></td>
 </tr>
 <tr>
@@ -44,6 +34,11 @@
 <tr>
 	<td>waitForVisible</td>
 	<td>link=${s_group_name}</td>
+	<td></td>
+</tr>
+<tr>
+	<td>waitForVisible</td>
+	<td>//a[@id=&quot;table-item-dropdown_${s_group_id}&quot;]</td>
 	<td></td>
 </tr>
 <tr>
@@ -67,7 +62,7 @@
 	<td></td>
 </tr>
 <tr>
-	<td>storeText</td>
+	<td>storeTextIfPresent</td>
 	<td>id=notifications</td>
 	<td>breadcrumbs</td>
 </tr>

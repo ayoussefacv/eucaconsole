@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2013-2014 Eucalyptus Systems, Inc.
+# Copyright 2013-2015 Hewlett Packard Enterprise Development LP
 #
 # Redistribution and use of this software in source and binary forms,
 # with or without modification, are permitted provided that the following
@@ -28,6 +28,8 @@
 Forms for Volumes
 
 """
+import re
+
 import wtforms
 from wtforms import validators
 
@@ -69,8 +71,7 @@ class VolumeForm(BaseSecureForm):
         self.size.error_msg = self.size_error_msg
         self.zone.error_msg = self.zone_error_msg
         self.choices_manager = ChoicesManager(conn=conn)
-        region = request.session.get('region')
-        self.set_choices(region)
+        self.set_choices(self.region)
 
         if volume is not None:
             self.name.data = volume.tags.get('Name', '')
@@ -122,8 +123,10 @@ class DeleteSnapshotForm(BaseSecureForm):
 
 class RegisterSnapshotForm(BaseSecureForm):
     """CSRF-protected form to delete a snapshot"""
-    name = wtforms.TextField(label=_(u'Name'),
-        validators=[validators.InputRequired(message=_(u'Image name is required'))])
+    name = wtforms.TextField(
+        label=_(u'Name'),
+        validators=[validators.InputRequired(message=_(u'Image name is required'))]
+    )
     description = wtforms.TextAreaField(
         label=_(u'Description'),
         validators=[
@@ -136,7 +139,7 @@ class RegisterSnapshotForm(BaseSecureForm):
 
 class AttachForm(BaseSecureForm):
     """CSRF-protected form to attach a volume to a selected instance
-       Note: This is for attaching a volume to a choice of instances on the volume detail page
+       Note: This is for attaching a volume to a choice of instances on the volume landing or detail page
              The form to attach a volume to an instance at the instance page is at forms.instances.AttachVolumeForm
     """
     instance_error_msg = _(u'Instance is required')
@@ -159,6 +162,7 @@ class AttachForm(BaseSecureForm):
         self.instance_id.error_msg = self.instance_error_msg
         self.device.error_msg = self.device_error_msg
         self.set_instance_choices()
+        self.clean_instance_id()
 
     def set_instance_choices(self):
         """Populate instance field with instances available to attach volume to"""
@@ -168,18 +172,25 @@ class AttachForm(BaseSecureForm):
             for instance in self.instances:
                 if instance.state in ["running", "stopped"] and self.volume.zone == instance.placement:
                     name_tag = instance.tags.get('Name')
-                    extra = ' ({name})'.format(name=name_tag) if name_tag else ''
-                    inst_name = '{id}{extra}'.format(id=instance.id, extra=extra)
+                    extra = u' ({name})'.format(name=name_tag) if name_tag else ''
+                    inst_name = u'{id}{extra}'.format(id=instance.id, extra=extra)
                     choices.append((instance.id, BaseView.escape_braces(inst_name)))
             if len(choices) == 1:
                 prefix = _(u'No available instances in availability zone')
-                msg = '{0} {1}'.format(prefix, self.volume.zone)
+                msg = u'{0} {1}'.format(prefix, self.volume.zone)
                 choices = [('', msg)]
             self.instance_id.choices = choices
         else:
             # We need to set all instances as choices for the landing page to avoid failed validation of instance field
-            # The landing page JS restricts the choices based on the selected volume's availability zone
+            # The volumes landing page JS restricts the choices based on the selected volume's availability zone
             self.instance_id.choices = [(instance.id, instance.id) for instance in self.instances]
+
+    def clean_instance_id(self):
+        """The instance id my include a garbled '? string:' prefix from a problematic Angular and Chosen interaction"""
+        if self.request.POST and 'instance_id' in self.request.POST:
+            instance_id = self.request.POST.get('instance_id', '')
+            cleaned_instance_id = re.sub(r'\? string:(i-\w+) \?', r'\1', instance_id)
+            self.request.POST['instance_id'] = cleaned_instance_id
 
 
 class DetachForm(BaseSecureForm):
@@ -197,16 +208,22 @@ class VolumesFiltersForm(BaseSecureForm):
         super(VolumesFiltersForm, self).__init__(request, **kwargs)
         self.request = request
         self.choices_manager = ChoicesManager(conn=conn)
-        region = request.session.get('region')
-        self.zone.choices = self.get_availability_zone_choices(region)
+        self.zone.choices = self.get_availability_zone_choices()
         self.status.choices = self.get_status_choices()
+        self.facets = [
+            {'name': 'zone', 'label': self.zone.label.text, 'options': self.get_availability_zone_choices()},
+            {'name': 'status', 'label': self.status.label.text, 'options': self.get_status_choices()},
+        ]
 
-    def get_availability_zone_choices(self, region):
-        return self.choices_manager.availability_zones(region, add_blank=False)
+    def get_availability_zone_choices(self):
+        return self.get_options_from_choices(self.choices_manager.availability_zones(self.region, add_blank=False))
 
     @staticmethod
     def get_status_choices():
-        return (
-            ('available', 'Available'),
-            ('in-use', 'In use'),
-        )
+        return [
+            {'key': 'creating', 'label': _(u'Creating')},
+            {'key': 'available', 'label': _(u'Available')},
+            {'key': 'attached', 'label': _(u'Attached')},
+            {'key': 'attaching', 'label': _(u'Attaching')},
+            {'key': 'detaching', 'label': _(u'Detaching')}
+        ]

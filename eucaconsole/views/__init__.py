@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2013-2014 Eucalyptus Systems, Inc.
+# Copyright 2013-2015 Hewlett Packard Enterprise Development LP
 #
 # Redistribution and use of this software in source and binary forms,
 # with or without modification, are permitted provided that the following
@@ -33,7 +33,9 @@ import hashlib
 import hmac
 import logging
 import pylibmc
+import socket
 import simplejson as json
+import string
 import textwrap
 import time
 from datetime import datetime, timedelta
@@ -43,6 +45,7 @@ from cgi import FieldStorage
 from contextlib import contextmanager
 from dateutil import tz
 from markupsafe import Markup
+from random import choice
 from urllib import urlencode
 from urlparse import urlparse
 try:
@@ -68,13 +71,13 @@ from ..forms.login import EucaLogoutForm
 from ..models.auth import EucaAuthenticator
 from ..i18n import _
 from ..models import Notification
-from ..models.auth import ConnectionManager
+from ..models.auth import ConnectionManager, RegionCache
 
 
 def escape_braces(event):
     """Escape double curly braces in template variables to prevent AngularJS expression injections"""
     for k, v in event.rendering_val.items():
-        if not k.endswith('_json'):
+        if not k.endswith('_json') and event.get('renderer_name') != 'json':
             if type(v) in [str, unicode] or isinstance(v, Markup) or isinstance(v, TranslationString):
                 event.rendering_val[k] = BaseView.escape_braces(v)
 
@@ -103,7 +106,7 @@ class JSONError(HTTPUnprocessableEntity):
 
 class BaseView(object):
     """Base class for all views"""
-    def __init__(self, request):
+    def __init__(self, request, **kwargs):
         self.request = request
         self.region = request.session.get('region')
         self.access_key = request.session.get('access_id')
@@ -131,37 +134,25 @@ class BaseView(object):
         if self.request.registry.settings:  # do this to pass tests
             validate_certs = asbool(self.request.registry.settings.get('connection.ssl.validation', False))
             certs_file = self.request.registry.settings.get('connection.ssl.certfile', None)
-            
-        if cloud_type == 'aws':
-            conn = ConnectionManager.aws_connection(
-                region, access_key, secret_key, security_token, conn_type, validate_certs)
-        elif cloud_type == 'euca':
-            host = self.request.registry.settings.get('clchost', 'localhost')
-            port = int(self.request.registry.settings.get('clcport', 8773))
-            if conn_type == 'ec2':
-                host = self.request.registry.settings.get('ec2.host', host)
-                port = int(self.request.registry.settings.get('ec2.port', port))
-            elif conn_type == 'autoscale':
-                host = self.request.registry.settings.get('autoscale.host', host)
-                port = int(self.request.registry.settings.get('autoscale.port', port))
-            elif conn_type == 'cloudwatch':
-                host = self.request.registry.settings.get('cloudwatch.host', host)
-                port = int(self.request.registry.settings.get('cloudwatch.port', port))
-            elif conn_type == 'elb':
-                host = self.request.registry.settings.get('elb.host', host)
-                port = int(self.request.registry.settings.get('elb.port', port))
-            elif conn_type == 'iam':
-                host = self.request.registry.settings.get('iam.host', host)
-                port = int(self.request.registry.settings.get('iam.port', port))
-            elif conn_type == 's3':
-                host = self.request.registry.settings.get('s3.host', host)
-                port = int(self.request.registry.settings.get('s3.port', port))
-            elif conn_type == 'vpc':
-                host = self.request.registry.settings.get('vpc.host', host)
-                port = int(self.request.registry.settings.get('vpc.port', port))
-
-            conn = ConnectionManager.euca_connection(
-                host, port, access_key, secret_key, security_token, conn_type, validate_certs, certs_file)
+        try:
+            if cloud_type == 'aws':
+                conn = ConnectionManager.aws_connection(
+                    region, access_key, secret_key, security_token, conn_type, validate_certs)
+            elif cloud_type == 'euca':
+                host = self._get_ufs_host_setting_()
+                port = self._get_ufs_port_setting_()
+                dns_enabled = self.request.session.get('dns_enabled', True)
+                regions = RegionCache(None).regions()
+                if len(regions) > 0:
+                    for region in regions:
+                        if region['endpoints']['ec2'].find(host) > -1:
+                            self.default_region = region['name']
+                conn = ConnectionManager.euca_connection(
+                    host, port, region, access_key, secret_key, security_token,
+                    conn_type, dns_enabled, validate_certs, certs_file
+                )
+        except socket.error as err:
+            BaseView.handle_error(err=BotoServerError(504, str(err)), request=self.request)
 
         return conn
 
@@ -170,8 +161,10 @@ class BaseView(object):
             return self.request.session.get('account')
         return self.request.session.get('access_id')  # AWS
 
-    def is_csrf_valid(self):
-        return self.request.session.get_csrf_token() == self.request.params.get('csrf_token')
+    def is_csrf_valid(self, token=None):
+        if token is None:
+            token = self.request.params.get('csrf_token')
+        return self.request.session.get_csrf_token() == token
 
     def _store_file_(self, filename, mime_type, contents):
         # disable using memcache for file storage
@@ -206,8 +199,16 @@ class BaseView(object):
             userdata = userdata_file or userdata_input or None  # Look up file upload first
         return userdata
 
+    def get_shared_buckets_storage_key(self, host):
+        return "{0}{1}{2}{3}".format(
+            host,
+            self.region,
+            self.request.session['account' if self.cloud_type == 'euca' else 'access_id'],
+            self.request.session['username'] if self.cloud_type == 'euca' else '',
+        )
+
     @long_term.cache_on_arguments(namespace='images')
-    def _get_images_cached_(self, _owners, _executors, _ec2_region, acct):
+    def _get_images_cached_(self, _owners, _executors, _ec2_region, acct, ufshost):
         """
         This method is decorated and will cache the image set
         """
@@ -246,9 +247,13 @@ class BaseView(object):
             acct = self.request.session.get('access_id', '')
         if 'amazon' in owners or 'aws-marketplace' in owners:
             acct = ''
+        ufshost = self.get_connection().host if self.cloud_type == 'euca' else ''
         try:
-            return self._get_images_cached_(owners, executors, ec2_region, acct)
-        except pylibmc.Error as err:
+            if self.cloud_type == 'euca' and asbool(self.request.registry.settings.get('cache.images.disable', False)):
+                return self._get_images_(owners, executors, ec2_region)
+            else:
+                return self._get_images_cached_(owners, executors, ec2_region, acct, ufshost)
+        except pylibmc.Error:
             logging.warn('memcached not responding')
             return self._get_images_(owners, executors, ec2_region)
 
@@ -257,25 +262,24 @@ class BaseView(object):
         acct = self.request.session.get('account', '')
         if acct == '':
             acct = self.request.session.get('access_id', '')
-        invalidate_cache(long_term, 'images', None, [], [], region, acct)
-        invalidate_cache(long_term, 'images', None, [u'self'], [], region, acct)
-        invalidate_cache(long_term, 'images', None, [], [u'self'], region, acct)
+        ufshost = self.get_connection().host if self.cloud_type == 'euca' else ''
+        invalidate_cache(long_term, 'images', None, [], [], region, acct, ufshost)
+        invalidate_cache(long_term, 'images', None, [u'self'], [], region, acct, ufshost)
+        invalidate_cache(long_term, 'images', None, [], [u'self'], region, acct, ufshost)
 
     def get_euca_authenticator(self):
         """
         This method centralizes configuration of the EucaAuthenticator.
         """
-        host = self.request.registry.settings.get('clchost', 'localhost')
-        port = int(self.request.registry.settings.get('clcport', 8773))
-        host = self.request.registry.settings.get('sts.host', host)
-        port = int(self.request.registry.settings.get('sts.port', port))
+        host = self._get_ufs_host_setting_()
+        port = self._get_ufs_port_setting_()
         validate_certs = asbool(self.request.registry.settings.get('connection.ssl.validation', False))
         conn = AWSAuthConnection(None, aws_access_key_id='', aws_secret_access_key='')
-        
         ca_certs_file = conn.ca_certificates_file
         conn = None
         ca_certs_file = self.request.registry.settings.get('connection.ssl.certfile', ca_certs_file)
-        auth = EucaAuthenticator(host, port, validate_certs=validate_certs, ca_certs=ca_certs_file)
+        dns_enabled = self.request.session.get('dns_enabled', True)
+        auth = EucaAuthenticator(host, port, dns_enabled, validate_certs=validate_certs, ca_certs=ca_certs_file)
         return auth
 
     def get_account_attributes(self, attribute_names=None):
@@ -286,6 +290,18 @@ class BaseView(object):
             with boto_error_handler(self.request):
                 attributes = conn.describe_account_attributes(attribute_names=attribute_names)
                 return attributes[0].attribute_values
+
+    def _get_ufs_host_setting_(self):
+        host = self.request.registry.settings.get('ufshost')
+        if not host:
+            host = self.request.registry.settings.get('clchost', 'localhost')
+        return host
+
+    def _get_ufs_port_setting_(self):
+        port = self.request.registry.settings.get('ufsport')
+        if not port:
+            port = self.request.registry.settings.get('clcport', 8773)
+        return int(port)
 
     @staticmethod
     def is_vpc_supported(request):
@@ -326,12 +342,12 @@ class BaseView(object):
         if cloud_type == 'euca':
             account = request.session.get('account', '')
             username = request.session.get('username', '')
-            prefix = '{0}/{1}@{2}'.format(account, username, BaseView.get_remote_addr(request))
+            prefix = u'{0}/{1}@{2}'.format(account, username, BaseView.get_remote_addr(request))
         elif cloud_type == 'aws':
             account = request.session.get('username_label', '')
             region = request.session.get('region')
-            prefix = '{0}/{1}@{2}'.format(account, region, BaseView.get_remote_addr(request))
-        log_message = "{prefix} [{id}]: {msg}".format(prefix=prefix, id=request.id, msg=message)
+            prefix = u'{0}/{1}@{2}'.format(account, region, BaseView.get_remote_addr(request))
+        log_message = u"{prefix} [{id}]: {msg}".format(prefix=prefix, id=request.id, msg=message)
         if level == 'info':
             logging.info(log_message)
         elif level == 'error':
@@ -343,28 +359,27 @@ class BaseView(object):
         self.log_message(self.request, message)
 
     @staticmethod
-    def handle_error(err=None, request=None, location=None, template="{0}"):
+    def handle_error(err=None, request=None, location=None, template=u"{0}"):
         status = getattr(err, 'status', None) or err.args[0] if err.args else ""
         message = template.format(err.reason)
         if err.error_message is not None:
             message = err.error_message
             if 'because of:' in message:
-                message = message[message.index("because of:")+11:]
+                message = message[message.index("because of:") + 11:]
             if 'RelatesTo Error:' in message:
-                message = message[message.index("RelatesTo Error:")+16:]
+                message = message[message.index("RelatesTo Error:") + 16:]
             # do we need this logic in the common code?? msg = err.message.split('remoteDevice')[0]
             # this logic found in volumes.js
         BaseView.log_message(request, message, level='error')
         perms_notice = _(u'You do not have the required permissions to perform this '
-                   u'operation. Please retry the operation, and contact your cloud '
-                   u'administrator to request an updated access policy if the problem '
-                   u'persists.')
+                         u'operation. Please retry the operation, and contact your cloud '
+                         u'administrator to request an updated access policy if the problem persists.')
         if request.is_xhr:
-            if 'Access Denied' in message:
+            if err.code in ['AccessDenied', 'UnauthorizedOperation']:
                 message = perms_notice
             raise JSONError(message=message, status=status or 403)
         if status == 403 or 'token has expired' in message:  # S3 token expiration responses return a 400 status
-            if 'Access Denied' in message and location is not None:
+            if err.code in ['AccessDenied', 'UnauthorizedOperation'] and location is not None:
                 request.session.flash(perms_notice, queue=Notification.ERROR)
                 raise HTTPFound(location=location)
 
@@ -373,10 +388,14 @@ class BaseView(object):
                        u'Please log in again, and contact your cloud administrator if the problem persists.')
             request.session.flash(notice, queue=Notification.WARNING)
             raise HTTPFound(location=request.route_path('login'))
-        request.session.flash(message, queue=Notification.ERROR)
         if location is None:
             location = request.current_route_url()
-        raise HTTPFound(location)
+        if status == 504:
+            request.session.flash(_(u'No response from host'), queue=Notification.ERROR)
+            raise HTTPFound(request.route_path('login'))
+        else:
+            request.session.flash(message, queue=Notification.ERROR)
+            raise HTTPFound(location)
 
     @staticmethod
     def escape_json(json_string):
@@ -406,7 +425,6 @@ class BaseView(object):
                       ['starts-with', '$key', prefix]]
         if token is not None:
             conditions.append({'x-amz-security-token': token})
-                      
         policy = {'conditions': conditions,
                   'expiration': time.strftime('%Y-%m-%dT%H:%M:%SZ',
                                               expire_time.timetuple())}
@@ -425,19 +443,39 @@ class BaseView(object):
     def has_role_access(request):
         return request.session['cloud_type'] == 'euca' and request.session['role_access']
 
+    @staticmethod
+    def generate_random_string(length=16):
+        chars = string.letters + string.digits
+        return ''.join(choice(chars) for i in range(length))
+
+    @staticmethod
+    def encode_unicode_dict(unicode_dict):
+        encoded_dict = {}
+        for k, v in unicode_dict.iteritems():
+            if isinstance(k, unicode):
+                k = k.encode('utf-8')
+            elif isinstance(k, str):
+                k.decode('utf-8')
+            if isinstance(v, unicode):
+                v = v.encode('utf-8')
+            elif isinstance(v, str):
+                v.decode('utf-8')
+            encoded_dict[k] = v
+        return encoded_dict
+
 
 class TaggedItemView(BaseView):
     """Common view for items that have tags (e.g. security group)"""
 
-    def __init__(self, request):
-        super(TaggedItemView, self).__init__(request)
+    def __init__(self, request, **kwargs):
+        super(TaggedItemView, self).__init__(request, **kwargs)
         self.tagged_obj = None
         self.conn = None
 
     def add_tags(self):
         if self.conn:
-            tags_json = self.request.params.get('tags')
-            tags_dict = json.loads(tags_json) if tags_json else {}
+            tags_json = self.request.params.get('tags', '{}')
+            tags_dict = self._normalize_tags(json.loads(tags_json))
             tags = {}
             for key, value in tags_dict.items():
                 key = self.unescape_braces(key.strip())
@@ -468,6 +506,27 @@ class TaggedItemView(BaseView):
                     tag_value = self.unescape_braces(value)
                     self.tagged_obj.add_tag('Name', tag_value)
 
+    def _normalize_tags(self, tags):
+        if type(tags) is dict:
+            return tags
+
+        new_tags = {}
+        for tag in tags:
+            name, value = tag['name'], tag['value']
+            new_tags[name] = value
+        return new_tags
+
+    @staticmethod
+    def serialize_tags(tags):
+        if tags is not None:
+            serialized_tags = [{
+                'name': key,
+                'value': value
+            } for key, value in tags.iteritems()]
+        else:
+            serialized_tags = []
+        return BaseView.escape_json(json.dumps(serialized_tags))
+
     @staticmethod
     def get_display_name(resource, escapebraces=True):
         name = ''
@@ -488,7 +547,7 @@ class TaggedItemView(BaseView):
         tags_array = []
         for key, val in tags.items():
             if not any([key.startswith('aws:'), key.startswith('euca:')]):
-                template = '{0}={1}'
+                template = u'{0}={1}'
                 if skip_name and key == 'Name':
                     continue
                 else:
@@ -531,9 +590,9 @@ class BlockDeviceMappingItemView(BaseView):
         for snapshot in self.conn.get_all_snapshots(owner='self'):
             value = snapshot.id
             snapshot_name = snapshot.tags.get('Name')
-            label = '{id}{name} ({size} GB)'.format(
+            label = u'{id}{name} ({size} GB)'.format(
                 id=snapshot.id,
-                name=' - {0}'.format(snapshot_name) if snapshot_name else '',
+                name=u' - {0}'.format(snapshot_name) if snapshot_name else '',
                 size=snapshot.volume_size
             )
             choices.append((value, label))
@@ -581,9 +640,8 @@ class LandingPageView(BaseView):
         For example, prefix = '/instances' for Instances
 
     """
-    def __init__(self, request):
-        super(LandingPageView, self).__init__(request)
-        self.filter_fields = []
+    def __init__(self, request, **kwargs):
+        super(LandingPageView, self).__init__(request, **kwargs)
         self.filter_keys = []
         self.sort_keys = []
         self.initial_sort_key = ''
@@ -642,21 +700,20 @@ class LandingPageView(BaseView):
         return False
 
     def get_json_endpoint(self, route, path=False):
-        return '{0}{1}'.format(
-            self.request.route_path(route) if path is False else route,
-            '?{0}'.format(urlencode(self.request.params)) if self.request.params else ''
-        )
+        return self.request.route_path(route) if path is False else route
 
     def get_redirect_location(self, route):
-        location = '{0}'.format(self.request.route_path(route))
+        location = u'{0}'.format(self.request.route_path(route))
+        encoded_get_params = self.encode_unicode_dict(self.request.GET)
         if self.request.GET:
-            location = '{0}?{1}'.format(location, urlencode(self.request.GET))
+            location = u'{0}?{1}'.format(location, urlencode(encoded_get_params))
         return location
 
 
 @notfound_view_config(renderer='../templates/notfound.pt')
 def notfound_view(request):
     """404 Not Found view"""
+    request.response.status = 404
     return dict()
 
 
@@ -676,23 +733,12 @@ def boto_error_handler(request, location=None, template="{0}"):
         yield
     except BotoServerError as err:
         BaseView.handle_error(err=err, request=request, location=location, template=template)
+    except socket.error as err:
+        BaseView.handle_error(err=BotoServerError(504, str(err)), request=request, location=location, template=template)
 
 
 @view_config(route_name='file_download', request_method='POST')
 def file_download(request):
-    # disable using memcache for file storage
-    # try:
-    #    file_value = default_term.get('file_cache')
-    #    if not isinstance(file_value, NoValue):
-    #        (filename, mime_type, contents) = file_value
-    #        default_term.delete('file_cache')
-    #        response = Response(content_type=mime_type)
-    #        response.body = str(contents)
-    #        response.content_disposition = 'attachment; filename="{name}"'.format(name=filename)
-    #        return response
-    # except pylibmc.Error as ex:
-    #    logging.warn('memcached not responding')
-    # try session instead
     session = request.session
     if session.get('file_cache'):
         (filename, mime_type, contents) = session['file_cache']

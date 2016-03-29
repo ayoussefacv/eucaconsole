@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2013-2014 Eucalyptus Systems, Inc.
+# Copyright 2013-2015 Hewlett Packard Enterprise Development LP
 #
 # Redistribution and use of this software in source and binary forms,
 # with or without modification, are permitted provided that the following
@@ -68,17 +68,10 @@ def top_nav(context, request, off_canvas=False):
     )
 
 
-@panel_config('landingpage_filters', renderer='../templates/panels/landingpage_filters.pt')
-def landingpage_filters(context, request, filters_form=None):
-    """Landing page filters form"""
-    return dict(
-        filters_form=filters_form,
-    )
-
-
 @panel_config('form_field', renderer='../templates/panels/form_field_row.pt')
 def form_field_row(context, request, field=None, reverse=False, leftcol_width=4, rightcol_width=8,
-                   inline=True, ng_attrs=None, **kwargs):
+                   leftcol_width_large=2, rightcol_width_large=10,
+                   inline=True, stack_label=False, ng_attrs=None, **kwargs):
     """ Widget for a singe form field row.
         The left/right column widths are Zurb Foundation grid units.
             e.g. leftcol_width=3 would set column for labels with a wrapper of <div class="small-3 columns">...</div>
@@ -119,11 +112,18 @@ def form_field_row(context, request, field=None, reverse=False, leftcol_width=4,
     # e.g. ${panel('form_field', field=volume_form['snapshot_id'], ng_attrs={'model': 'snapshot_id'}, **html_attrs)}
     if ng_attrs:
         for ngkey, ngvalue in ng_attrs.items():
-            html_attrs['ng-{0}'.format(ngkey)] = ngvalue
+            html_attrs[u'ng-{0}'.format(ngkey)] = ngvalue
+
+    if stack_label:
+        leftcol_width = 0
+        leftcol_width_large = 0
+        rightcol_width_large = 12
 
     return dict(
         field=field, error_msg=error_msg, html_attrs=html_attrs, inline=inline, checkbox=checkbox,
-        leftcol_width=leftcol_width, rightcol_width=rightcol_width, reverse=reverse
+        leftcol_width=leftcol_width, rightcol_width=rightcol_width,
+        leftcol_width_large=leftcol_width_large, rightcol_width_large=rightcol_width_large,
+        reverse=reverse, stack_label=stack_label
     )
 
 
@@ -146,11 +146,11 @@ def tag_editor(context, request, tags=None, leftcol_width=4, rightcol_width=8, s
 
 
 @panel_config('user_editor', renderer='../templates/panels/user_editor.pt')
-def user_editor(context, request, leftcol_width=4, rightcol_width=8):
+def user_editor(context, request, leftcol_width=4, rightcol_width=8, help_text=None, show_admin=False):
     """ User editor panel.
         Usage example (in Chameleon template): ${panel('user_editor')}
     """
-    return dict(leftcol_width=leftcol_width, rightcol_width=rightcol_width)
+    return dict(leftcol_width=leftcol_width, rightcol_width=rightcol_width, help_text=help_text, show_admin=show_admin)
 
 
 @panel_config('policy_list', renderer='../templates/panels/policy_list.pt')
@@ -158,7 +158,8 @@ def policy_list(context, request, policies_url=None, policy_url=None, remove_url
     """ User list panel.
         Usage example (in Chameleon template): ${panel('policy_list')}
     """
-    return dict(policies_url=policies_url, policy_url=policy_url, remove_url=remove_url, update_url=update_url, add_url=add_url)
+    return dict(policies_url=policies_url, policy_url=policy_url,
+                remove_url=remove_url, update_url=update_url, add_url=add_url)
 
 
 @panel_config('autoscale_tag_editor', renderer='../templates/panels/autoscale_tag_editor.pt')
@@ -223,10 +224,10 @@ def securitygroup_rules(context, request, rules=None, rules_egress=None, leftcol
     controller_options_json = BaseView.escape_json(json.dumps({
         'rules_array': rules_sorted,
         'rules_egress_array': rules_egress_sorted,
-        'json_endpoint': request.route_path('securitygroups_json'),
+        'json_endpoint': request.route_path('securitygroups_json') + "?incl_elb_groups=",
         'protocols_json_endpoint': request.route_path('internet_protocols_json'),
     }))
-    remote_addr=BaseView.get_remote_addr(request)
+    remote_addr = BaseView.get_remote_addr(request)
 
     return dict(
         protocol_choices=RULE_PROTOCOL_CHOICES,
@@ -239,18 +240,21 @@ def securitygroup_rules(context, request, rules=None, rules_egress=None, leftcol
 
 
 @panel_config('securitygroup_rules_preview', renderer='../templates/panels/securitygroup_rules_preview.pt')
-def securitygroup_rules_preview(context, request, leftcol_width=3, rightcol_width=9):
+def securitygroup_rules_preview(context, request, leftcol_width=3, rightcol_width=9,
+                                leftcol_width_large=2, rightcol_width_large=10):
     """ Security group rules preview, used in Launch Instance and Create Launch Configuration wizards.
     """
     return dict(
         leftcol_width=leftcol_width,
         rightcol_width=rightcol_width,
+        leftcol_width_large=leftcol_width_large,
+        rightcol_width_large=rightcol_width_large,
     )
 
 
 @panel_config('bdmapping_editor', renderer='../templates/panels/bdmapping_editor.pt')
-def bdmapping_editor(context, request, image=None, launch_config=None, snapshot_choices=None,
-                     read_only=False, disable_dot=False):
+def bdmapping_editor(context, request, image=None, instance=None, volumes=None,
+                     launch_config=None, snapshot_choices=None, read_only=False, disable_dot=False, add_hr=False):
     """ Block device mapping editor (e.g. for Launch Instance page).
         Usage example (in Chameleon template): ${panel('bdmapping_editor', image=image, snapshot_choices=choices)}
     """
@@ -265,6 +269,20 @@ def bdmapping_editor(context, request, image=None, launch_config=None, snapshot_
                 snapshot_id=device.snapshot_id,
                 size=device.size,
                 delete_on_termination=device.delete_on_termination,
+            )
+    if instance is not None and volumes is not None:
+        bdm_map = instance.block_device_mapping or []
+        for device_name in bdm_map:
+            bdm = bdm_map[device_name]
+            if device_name in bdm_dict.keys():
+                continue
+            volume = [vol for vol in volumes if vol.id == bdm.volume_id][0]
+            bdm_dict[device_name] = dict(
+                is_root=True if instance.root_device_name == device_name else False,
+                virtual_name=bdm.ephemeral_name,
+                snapshot_id=getattr(volume, 'snapshot_id', None),
+                size=getattr(volume, 'size', None),
+                delete_on_termination=bdm.delete_on_termination,
             )
     if launch_config is not None:
         bdm_list = launch_config.block_device_mappings or []
@@ -290,6 +308,7 @@ def bdmapping_editor(context, request, image=None, launch_config=None, snapshot_
         controller_options_json=controller_options_json,
         read_only=read_only,
         disable_dot=disable_dot,
+        add_hr=add_hr
     )
 
 
@@ -308,9 +327,11 @@ def image_picker(context, request, image=None, filters_form=None,
         'cloud_type': request.session.get('cloud_type'),
         'images_json_endpoint': request.route_path('images_json')
     }))
+    search_facets = filters_form.facets if filters_form is not None else []
     return dict(
         image=image,
-        filters_form=filters_form,
+        search_facets=BaseView.escape_json(json.dumps(search_facets)),
+        filter_keys=[],  # defined within image picker javascript
         maxheight=maxheight,
         owner_choices=owner_choices,
         prefix_route=prefix_route,
@@ -376,13 +397,13 @@ def s3_sharing_panel(context, request, bucket_object=None, sharing_form=None, sh
                 uri=grant.uri,
             ))
     grantee_choices = [
-        ('http://acs.amazonaws.com/groups/global/AllUsers', _(u'all users')),
-        ('http://acs.amazonaws.com/groups/global/AuthenticatedUsers', _(u'authenticated users')),
+        ('http://acs.amazonaws.com/groups/global/AllUsers', _(u'Anyone with the URL')),
+        ('http://acs.amazonaws.com/groups/global/AuthenticatedUsers', _(u'Authenticated users')),
     ]
     if isinstance(bucket_object, Key):
         bucket_owner_id = bucket_object.bucket.get_acl().owner.id
         grantee_choices.append(
-            (bucket_owner_id, _('bucket owner'))
+            (bucket_owner_id, _('Bucket owner'))
         )
     controller_options_json = BaseView.escape_json(json.dumps({
         'grants': grants_list,
@@ -411,3 +432,17 @@ def s3_metadata_editor(context, request, bucket_object=None, metadata_form=None)
         metadata_key_no_results_text=_(u'Click below to add the new key'),
     )
 
+
+@panel_config('elb_listener_editor', renderer='../templates/panels/elb_listener_editor.pt')
+def elb_listener_editor(context, request, listener_list=None, protocol_list=None, elb_security_policy=None):
+    """ ELB listener editor panel """
+    listener_list = listener_list or {}
+    controller_options_json = BaseView.escape_json(json.dumps({
+        'listener_list': listener_list,
+        'protocol_list': protocol_list,
+        'certificate_required_notice': _(u'Certificate is required'),
+    }))
+    return dict(
+        controller_options_json=controller_options_json,
+        elb_security_policy=elb_security_policy,
+    )

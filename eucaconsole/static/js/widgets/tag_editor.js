@@ -3,19 +3,20 @@
  * @requires AngularJS
  *
  */
-angular.module('TagEditor', ['ngSanitize', 'EucaConsoleUtils'])
+angular.module('TagEditor', ['ngSanitize', 'EucaConsoleUtils', 'FormComponents'])
     .filter('ellipsis', function () {
         return function (line, num) {
-            if( line.length <= num ){
+            if (!line) return line;
+            if (line.length <= num) {
                 return line;
             }
             return line.substring(0, num) + "...";
         };
     })
     .controller('TagEditorCtrl', function ($scope, $sanitize, $timeout, eucaUnescapeJson) {
-        $scope.tagEditor = $('#tag-editor');
-        $scope.tagInputs = $scope.tagEditor.find('.taginput');
-        $scope.tagsTextarea = $scope.tagEditor.find('textarea#tags');
+        $scope.tagEditor = undefined;
+        $scope.tagInputs = undefined;
+        $scope.tagsTextarea = undefined;
         $scope.tagsArray = [];
         $scope.newTagKey = '';
         $scope.newTagValue = '';
@@ -47,7 +48,7 @@ angular.module('TagEditor', ['ngSanitize', 'EucaConsoleUtils'])
         $scope.updateTagCount = function () {
             $scope.tagCount = $scope.tagsArray.length;
             // Add +1 to the tag count if a name is entered on the form 
-            if ($scope.isNameTagIncluded() == false) { 
+            if ($scope.isNameTagIncluded() === false) { 
                 if ($('#security-group-detail-form').length > 0) {
                     // security groups have their own name attributes, thus skip
                     return;
@@ -81,7 +82,7 @@ angular.module('TagEditor', ['ngSanitize', 'EucaConsoleUtils'])
         };
         $scope.initTags = function(optionsJson) {
             var options = JSON.parse(eucaUnescapeJson(optionsJson));
-            var tagsObj = options['tags'];
+            var tagsObj = options.tags;
             Object.keys(tagsObj).forEach(function(key) {
                 if (!key.match(/^aws:.*/) && !key.match(/^euca:.*/)) {
                     $scope.tagsArray.push({
@@ -90,6 +91,9 @@ angular.module('TagEditor', ['ngSanitize', 'EucaConsoleUtils'])
                     });
                 }
             });
+            $scope.tagEditor = $('#tag-editor');
+            $scope.tagInputs = $scope.tagEditor.find('.taginput');
+            $scope.tagsTextarea = $scope.tagEditor.find('textarea#tags');
             $('#tag-name-input').keydown(function(evt) {
                 if (evt.keyCode === 13) {
                     evt.preventDefault();
@@ -100,13 +104,13 @@ angular.module('TagEditor', ['ngSanitize', 'EucaConsoleUtils'])
                     evt.preventDefault();
                 }
             });
-            $scope.showNameTag = options['show_name_tag'];
+            $scope.showNameTag = options.show_name_tag;
             $scope.syncTags();
             $scope.setWatch();
         };
         $scope.keyListener = function ($event) {
             if ($event.keyCode == 13) {
-                $scope.addTag($event)
+                $scope.addTag($event);
             }
         };
         $scope.getSafeTitle = function (tag) {
@@ -131,9 +135,10 @@ angular.module('TagEditor', ['ngSanitize', 'EucaConsoleUtils'])
                 existingTagFound = false,
                 form = $($event.currentTarget).closest('form');
             if (tagKeyField.val() && tagValueField.val()) {
-                // disallow adding tags starting with aws:. abide handles
+                // disallow adding tags starting with aws: or euca:. abide handles
                 // alerting the user
-                if (tagKeyField.val().indexOf("aws:") == 0) {
+                if (tagKeyField.val().indexOf("aws:") === 0 ||
+                    tagKeyField.val().indexOf("euca:") === 0) {
                     return false;
                 }
                 // Avoid adding a new tag if the name duplicates an existing one.
@@ -159,7 +164,11 @@ angular.module('TagEditor', ['ngSanitize', 'EucaConsoleUtils'])
                     $scope.newTagValue = '';
                 }
             } else {
-                tagKeyField.val() ? tagValueField.focus() : tagKeyField.focus();
+                if (tagKeyField.val()) {
+                    tagValueField.focus();
+                } else {
+                    tagKeyField.focus();
+                }
             }
         };
         $scope.checkRequiredInput = function () {
@@ -169,6 +178,8 @@ angular.module('TagEditor', ['ngSanitize', 'EucaConsoleUtils'])
                 $scope.isTagNotComplete = true;
             } else if ($('#tag-name-input-div').hasClass('error') ||
                 $('#tag-value-input-div').hasClass('error')) {
+                $scope.isTagNotComplete = true;
+            } else if ($scope.tagEditorForm.$invalid) {
                 $scope.isTagNotComplete = true;
             } else {
                 $scope.isTagNotComplete = false;
@@ -212,7 +223,7 @@ angular.module('TagEditor', ['ngSanitize', 'EucaConsoleUtils'])
                 $scope.updateVisibleTagsCount();
             }, true);
             // When user enters name field, check the tag count
-            if ($('#launch-instance-form').length != 0) {
+            if ($('#launch-instance-form').length !== 0) {
                 // Special case for the launch instance wizard where mutiple name fields exist
                 $(document).on('keyup', 'input.name', function (event) {
                     $scope.updateTagCount();

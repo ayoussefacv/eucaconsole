@@ -1,6 +1,7 @@
 <metal:block use-macro="main_template" i18n:domain="eucaconsole">
 
 <head metal:fill-slot="head_css">
+    <meta http-equiv="refresh" content="300" /><!--! Reload page to refresh generated download URLs every 5 min -->
     <link rel="stylesheet" type="text/css" href="${request.static_path('eucaconsole:static/css/pages/bucket_item_details.css')}" />
 </head>
 
@@ -30,10 +31,13 @@
                 <em>${item_name}</em>
             </metal:block>
         </h3>
-        <div class="large-8 columns">
+        <div class="large-12 columns">
             <div class="panel has-actions">
                 <metal:block metal:use-macro="layout.global_macros['actions_menu']">
                     <metal:actions metal:fill-slot="actions">
+                        <li>
+                            <a href="${item_open_url}" id="open-action" target="_blank" i18n:translate="">Open</a>
+                        </li>
                         <li>
                             <a href="${item_download_url}" id="download-action" i18n:translate="">Download</a>
                         </li>
@@ -59,23 +63,42 @@
                         ${panel('form_field', field=details_form.friendly_name, pattern=details_form.friendly_name_pattern, ng_attrs={'model': 'objectName'})}
                     </div>
                     <div class="row controls-wrapper readonly" tal:condition="bucket_item.version_id">
-                        <div class="small-4 columns"><label i18n:translate="">Version</label></div>
-                        <div class="small-8 columns value">${bucket_item.version_id}</div>
+                        <div class="large-2 small-4 columns"><label i18n:translate="">Version</label></div>
+                        <div class="large-10 small-8 columns value">${bucket_item.version_id}</div>
                     </div>
                     <div class="row controls-wrapper readonly">
-                        <div class="small-4 columns"><label i18n:translate="">Last modified</label></div>
-                        <div class="small-8 columns value" ng-cloak="">
+                        <div class="large-2 small-4 columns"><label i18n:translate="">Last modified</label></div>
+                        <div class="large-10 small-8 columns value" ng-cloak="">
                             {{'${last_modified}' | date:'${layout.angular_date_format}'}}
                         </div>
                     </div>
                     <div class="row controls-wrapper readonly">
-                        <div class="small-4 columns"><label i18n:translate="">ETag</label></div>
-                        <div class="small-8 columns value">${bucket_item.etag.replace('"', '')}</div>
+                        <div class="large-2 small-4 columns"><label i18n:translate="">ETag</label></div>
+                        <div class="large-10 small-8 columns value">${bucket_item.etag.replace('"', '')}</div>
                     </div>
                     <div class="row controls-wrapper readonly">
-                        <div class="small-4 columns"><label i18n:translate="">Link</label></div>
-                        <div class="small-8 columns value">
-                            <a href="${item_link}" class="breakword" target="_blank">${item_link.split('?')[0]}</a>
+                        <div class="large-2 small-4 columns"><label i18n:translate="">Link</label></div>
+                        <div class="large-10 small-8 columns value">
+                            <i class="fa fa-unlock" tal:condition="item_is_public" data-tooltip="" i18n:attributes="title"
+                               title="This is a public link. Anyone with the link can access it."
+                               ></i>
+                            <i class="fa fa-lock" tal:condition="not item_is_public" data-tooltip="" i18n:attributes="title"
+                               title="This is a private link. Use the actions menu to make it public,
+                                      or click the Share button to create a shareable private link"
+                               ></i>
+                            <a href="${item_link}" class="breakword" target="_blank">${item_link}</a>
+                            <small tal:condition="ufshost_error" style="display:block" class="error">
+                                <i class="fi-alert"></i>
+                                <span i18n:translate="">This link will not work because it includes localhost. Please ask your administrator to change the ufshost setting to the fully qualified domain name or the IP address of the machine running User Facing Services.
+                                </span>
+                            </small>
+                        </div>
+                    </div>
+                    <div class="row controls-wrapper readonly" tal:condition="not item_is_public">
+                        <div class="large-10 small-8 columns value right">
+                            <button class="button round small" data-reveal-id="shared-url-modal" i18n:translate="">
+                                Share Private Link
+                            </button>
                         </div>
                     </div>
                     <hr />
@@ -94,8 +117,7 @@
                 </form>
             </div>
         </div>
-        <div class="large-4 columns">
-            <!--<div class="help-padding">&nbsp;</div>-->
+        <div class="large-12 columns">
             <metal:block metal:use-macro="layout.global_macros['help_expando']" />
             <div class="help-content" ng-show="isHelpExpanded" ng-cloak="">
                 <!-- HELP CONTENT -->
@@ -104,7 +126,9 @@
                 </div> 
             </div>
         </div>
+        <!-- Modal dialogs -->
         ${panel('bucket_item_dialogs')}
+        ${panel('bucket_item_shared_url_dialog', shared_url_form=shared_url_form)}
     </div>
 </div>
 

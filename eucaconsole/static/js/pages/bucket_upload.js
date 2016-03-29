@@ -41,7 +41,7 @@ angular.module('UploadFilePage', ['S3SharingPanel', 'S3MetadataEditor'])
             $scope.$on('s3:sharingPanelAclUpdated', function () {
                 $scope.hasChangesToBeSaved = true;
             });
-            $scope.$watch('files', function (newVals) {
+            $scope.$watchCollection('files', function (newVals) {
                 $('#size-error').css('display', 'none');
                 $scope.isNotValid = false;
                 if (newVals.length > 0) {
@@ -69,7 +69,7 @@ angular.module('UploadFilePage', ['S3SharingPanel', 'S3MetadataEditor'])
             // Display warning when there's an unsaved Sharing Panel entry
             form.on('submit', function (event) {
                 var accountInputField = form.find('#share_account:visible');
-                if (accountInputField.length && accountInputField.val() != '') {
+                if (accountInputField.length && accountInputField.val() !== '') {
                     event.preventDefault();
                     $scope.isSubmitted = false;
                     $('#unsaved-sharing-warning-modal').foundation('reveal', 'open');
@@ -105,10 +105,12 @@ angular.module('UploadFilePage', ['S3SharingPanel', 'S3MetadataEditor'])
                         var parentWindow = window.opener;
                         $('#upload-files-modal').foundation('reveal', 'close');
                         $scope.hasChangesToBeSaved = false;
-                        parentWindow.postMessage('s3:fileUploaded', '*');
+                        if (parentWindow) {
+                            parentWindow.postMessage('s3:fileUploaded', '*');
+                        }
                         $scope.cancel();
                     }
-                    if ($scope.uploading == true) {
+                    if ($scope.uploading === true) {
                         $scope.uploadFile();
                     }
                 }).
@@ -124,11 +126,11 @@ angular.module('UploadFilePage', ['S3SharingPanel', 'S3MetadataEditor'])
             $scope.uploading = false;
             $scope.progress = 0;
             $scope.hasChangesToBeSaved = false;
-            $scope.cancel()
+            $scope.cancel();
         };
         $scope.cancel = function () {
-            if (window.matchMedia(Foundation.media_queries['small']).matches === false) {
-                window.close()
+            if (Foundation.utils.is_medium_up()) {
+                window.close();
             }
             else {
                 window.location = $scope.bucketUrl;

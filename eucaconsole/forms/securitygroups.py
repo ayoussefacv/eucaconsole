@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2013-2014 Eucalyptus Systems, Inc.
+# Copyright 2013-2015 Hewlett Packard Enterprise Development LP
 #
 # Redistribution and use of this software in source and binary forms,
 # with or without modification, are permitted provided that the following
@@ -32,19 +32,26 @@ import wtforms
 from wtforms import validators
 
 from ..i18n import _
-from . import BaseSecureForm, ChoicesManager, TextEscapedField
+from ..views import BaseView
+from . import BaseSecureForm, ChoicesManager, TextEscapedField, ASCII_WITHOUT_SLASHES_NOTICE
 
 
 class SecurityGroupForm(BaseSecureForm):
-    """Security Group form
-       Note: no need to add a 'tags' field.  Use the tag_editor panel (in a template) instead
+    """Security Group create/edit form
+       Constraints for VPC security group name/desc: a-z, A-Z, 0-9, spaces, and ._-:/()#,@[]+=;{}!$*
+       See http://docs.aws.amazon.com/cli/latest/reference/ec2/create-security-group.html
     """
-    name_error_msg = _(u'Name is required')
+    name_error_msg = ASCII_WITHOUT_SLASHES_NOTICE
     name = wtforms.TextField(
         label=_(u'Name'),
         validators=[validators.DataRequired(message=name_error_msg)],
     )
-    desc_error_msg = _(u'Description is required')
+    sgroup_description_pattern = r'^[a-zA-Z0-9\s\._\-:\/\(\)#,@\[\]\+=;\{\}!\$\*]+$'
+    DESCRIPTION_RESTRICTION_NOTICE = _(
+        u'Description is required, must be between 1 and 255 characters, and may only contain '
+        u'letters, numbers, spaces, and the following characters:')
+    special_chars = u'._-:/()#,@[]+=;{}!$*'
+    desc_error_msg = u'{0} {1}'.format(DESCRIPTION_RESTRICTION_NOTICE, special_chars)
     description = wtforms.TextAreaField(
         label=_(u'Description'),
         validators=[
@@ -60,7 +67,6 @@ class SecurityGroupForm(BaseSecureForm):
         self.name.error_msg = self.name_error_msg  # Used for Foundation Abide error message
         self.description.error_msg = self.desc_error_msg  # Used for Foundation Abide error message
         self.vpc_choices_manager = ChoicesManager(conn=vpc_conn)
-        region = request.session.get('region')
         self.cloud_type = request.session.get('cloud_type', 'euca')
         from ..views import BaseView
         self.is_vpc_supported = BaseView.is_vpc_supported(request)
@@ -100,3 +106,9 @@ class SecurityGroupsFiltersForm(BaseSecureForm):
         if self.cloud_type == 'aws':
             self.vpc_id.choices.append(('None', _(u'No VPC')))
         self.vpc_id.choices = sorted(self.vpc_id.choices)
+        self.facets = []
+        if BaseView.is_vpc_supported(request):
+            self.facets.append(
+                {'name': 'vpc_id', 'label': self.vpc_id.label.text,
+                    'options': self.get_options_from_choices(self.vpc_id.choices)}
+            )

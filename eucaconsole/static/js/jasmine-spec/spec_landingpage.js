@@ -24,7 +24,7 @@ describe("LandingPage", function() {
         var template = window.__html__['templates/instances/instances.pt'];
         // remove <script src> and <link> tags to avoid phantomJS error
         template = template.replace(/script src/g, "script ignore_src"); 
-        template = template.replace(/\<link/g, "\<ignore_link"); 
+        template = template.replace(/<link/g, "<ignore_link"); 
         setFixtures(template);
     });
 
@@ -58,10 +58,10 @@ describe("LandingPage", function() {
             expect(scope.pageResource).toEqual('instances');
         });
 
-        it("Should call storeAWSRegion() when initController() is called", function() {
-            spyOn(scope, 'storeAWSRegion');
+        it("Should call storeRegion() when initController() is called", function() {
+            spyOn(scope, 'storeRegion');
             scope.initController('instances', '[]', 'a');
-            expect(scope.storeAWSRegion).toHaveBeenCalled();
+            expect(scope.storeRegion).toHaveBeenCalled();
         });
     });
 });

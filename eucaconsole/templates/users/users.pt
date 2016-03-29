@@ -31,7 +31,7 @@
                    href="${request.route_path('user_view', name='new')}">Create New Users</a>
             </div>
             <div metal:fill-slot="tile_dropdown_button" tal:omit-tag="">
-                <a id="tile-item-dropdown_{{ item.user_name | escapeHTMLTagID }}" class="tiny secondary button dropdown right" data-dropdown="item-dropdown_{{ item.user_name | escapeHTMLTagID }}"><i class="fi-widget"></i></a>
+                <a id="tile-item-dropdown_{{ item.user_name | escapeHTMLTagID }}" class="tiny secondary button dropdown right" data-dropdown="item-dropdown_{{ item.user_name | escapeHTMLTagID }}"><i class="grid-action"></i></a>
                 <ul id="item-dropdown_{{ item.user_name | escapeHTMLTagID }}" class="f-dropdown" data-dropdown-content="">
                     <li ng-show="item.user_enabled">
                         <a i18n:translate="" ng-href="${prefix}/{{ item.user_name }}">View details</a>
@@ -74,7 +74,7 @@
                 <div ng-show="item.num_keys == 0 &amp;&amp; item.user_enabled"><a class="link" ng-click="linkUser(item, '?tab=security-tab')" i18n:translate="">Does not have active access keys</a></div>
                  <span class="footer status active" ng-show="item.user_enabled == true" i18n:translate="">Active</span>
                  <span class="footer status disabled" ng-show="item.user_enabled == false" i18n:translate="">Disabled</span>
-                 <span class="dots" ng-show="item.user_enabled == undefined">&nbsp;</span>
+                 <i ng-show="item.user_enabled == undefined" class="busy" ></i>
             </div>
             <metal:block metal:fill-slot="tableview_headers">
                 <th i18n:translate="">User name</th>
@@ -94,7 +94,7 @@
                     <span class="label radius item status active" ng-show="item.user_enabled == true" i18n:translate="">Active</span>
                     <span class="label radius item status disabled" ng-show="item.user_enabled == false" i18n:translate="">Disabled</span>
                     <span class="label radius item status undefined" ng-show="item.user_enabled == undefined">&nbsp;</span>
-                    <span class="dots" ng-show="item.user_enabled == undefined">&nbsp;</span>
+                    <i ng-show="item.user_enabled == undefined" class="busy" ></i>
                 </td>
                 <td class="count">
                     <a ng-click="linkUser(item, '?tab=group-section')" ng-show="item.user_enabled">{{ item.num_groups }}</a>
@@ -114,7 +114,7 @@
                 </td>
                 <td>
                   <span class="actions">
-                    <a id="table-item-dropdown_{{ item.user_name | escapeHTMLTagID }}" class="tiny secondary button dropdown round" data-dropdown="item-dropdown_{{ item.user_name | escapeHTMLTagID }}"><i class="fi-widget"></i></a>
+                    <a id="table-item-dropdown_{{ item.user_name | escapeHTMLTagID }}" class="tiny secondary button dropdown round" data-dropdown="item-dropdown_{{ item.user_name | escapeHTMLTagID }}"><i class="grid-action"></i></a>
                     <ul id="item-dropdown_{{ item.user_name | escapeHTMLTagID }}" class="f-dropdown" data-dropdown-content="">
                         <li ng-show="item.user_enabled">
                             <a i18n:translate="" ng-href="${prefix}/{{ item.user_name }}">View details</a>
@@ -150,7 +150,7 @@
 </metal:block>
 
 <div metal:fill-slot="tail_js">
-    <script src="${request.static_path('eucaconsole:static/js/pages/custom_filters.js')}"></script>
+    <script src="${request.static_path('eucaconsole:static/js/widgets/expando.js')}"></script>
     <script src="${request.static_path('eucaconsole:static/js/pages/landingpage.js')}"></script>
     <script src="${request.static_path('eucaconsole:static/js/pages/users.js')}"></script>
 </div>

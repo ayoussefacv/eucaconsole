@@ -24,7 +24,7 @@ describe("BucketContentsPage", function() {
         var template = window.__html__['templates/buckets/bucket_contents.pt'];
         // remove <script src> and <link> tags to avoid phantomJS error
         template = template.replace(/script src/g, "script ignore_src"); 
-        template = template.replace(/\<link/g, "\<ignore_link"); 
+        template = template.replace(/<link/g, "<ignore_link"); 
         setFixtures(template);
     });
 
@@ -61,9 +61,9 @@ describe("BucketContentsPage", function() {
         it("Initial value of total is 0", function() {
             expect(scope.total).toEqual(0);
         });
-        it("Initial value of chunkSize is 10", function() {
+        it("Initial value of chunkSize is 100", function() {
 
-            expect(scope.chunkSize).toEqual(10);
+            expect(scope.chunkSize).toEqual(100);
         });
     });
 

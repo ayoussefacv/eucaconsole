@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2013-2014 Eucalyptus Systems, Inc.
+# Copyright 2013-2015 Hewlett Packard Enterprise Development LP
 #
 # Redistribution and use of this software in source and binary forms,
 # with or without modification, are permitted provided that the following
@@ -90,6 +90,7 @@ class LoginView(BaseView, PermissionCheckMixin):
 
     def __init__(self, request):
         super(LoginView, self).__init__(request)
+        self.title_parts = [_(u'Login')]
         self.euca_login_form = EucaLoginForm(self.request, formdata=self.request.params or None)
         self.aws_login_form = AWSLoginForm(self.request, formdata=self.request.params or None)
         self.aws_enabled = asbool(request.registry.settings.get('enable.aws'))
@@ -101,6 +102,7 @@ class LoginView(BaseView, PermissionCheckMixin):
         self.came_from = self.sanitize_url(self.request.params.get('came_from', referrer))
         self.login_form_errors = []
         self.duration = str(int(self.request.registry.settings.get('session.cookie_expires')) + 60)
+        self.login_refresh = str(int(self.request.registry.settings.get('session.timeout')) - 60)
         self.secure_session = asbool(self.request.registry.settings.get('session.secure', False))
         self.https_proxy = self.request.environ.get('HTTP_X_FORWARDED_PROTO') == 'https'
         self.https_scheme = self.request.scheme == 'https'
@@ -115,13 +117,12 @@ class LoginView(BaseView, PermissionCheckMixin):
             login_form_errors=self.login_form_errors,
             aws_enabled=self.aws_enabled,
             duration=self.duration,
+            login_refresh=self.login_refresh,
             came_from=self.came_from,
             controller_options_json=options_json,
         )
 
     def show_https_warning(self):
-        if any([self.https_proxy, self.https_scheme]) and not self.secure_session:
-            return True
         if self.secure_session and not (any([self.https_proxy, self.https_scheme])):
             return True
         return False
@@ -158,14 +159,16 @@ class LoginView(BaseView, PermissionCheckMixin):
             account = self.request.params.get('account')
             username = self.request.params.get('username')
             password = self.request.params.get('password')
+            euca_region = self.request.params.get('euca-region')
             try:
+                # TODO: also return dns enablement
                 creds = auth.authenticate(
                     account=account, user=username, passwd=password,
                     new_passwd=new_passwd, timeout=8, duration=self.duration)
-                logging.info("Authenticated Eucalyptus user: {acct}/{user} from {ip}".format(
+                logging.info(u"Authenticated Eucalyptus user: {acct}/{user} from {ip}".format(
                     acct=account, user=username, ip=BaseView.get_remote_addr(self.request)))
-                user_account = '{user}@{account}'.format(user=username, account=account)
-                # self.invalidate_connection_cache()
+                default_region = self.request.registry.settings.get('default.region', 'euca')
+                user_account = u'{user}@{account}'.format(user=username, account=account)
                 session.invalidate()  # Refresh session
                 session['cloud_type'] = 'euca'
                 session['account'] = account
@@ -173,8 +176,9 @@ class LoginView(BaseView, PermissionCheckMixin):
                 session['session_token'] = creds.session_token
                 session['access_id'] = creds.access_key
                 session['secret_key'] = creds.secret_key
-                session['region'] = 'euca'
+                session['region'] = euca_region if euca_region != '' else default_region
                 session['username_label'] = user_account
+                session['dns_enabled'] = auth.dns_enabled  # this *must* be prior to line below
                 session['supported_platforms'] = self.get_account_attributes(['supported-platforms'])
                 session['default_vpc'] = self.get_account_attributes(['default-vpc'])
 
@@ -183,15 +187,17 @@ class LoginView(BaseView, PermissionCheckMixin):
                 headers = remember(self.request, user_account)
                 return HTTPFound(location=self.came_from, headers=headers)
             except HTTPError, err:
-                logging.info("http error "+str(vars(err)))
+                logging.info("http error " + str(vars(err)))
                 if err.code == 403:  # password expired
                     changepwd_url = self.request.route_path('managecredentials')
-                    return HTTPFound(changepwd_url+("?expired=true&account=%s&username=%s" % (account, username)))
+                    return HTTPFound(
+                        changepwd_url + ("?came_from=&expired=true&account=%s&username=%s" % (account, username))
+                    )
                 elif err.msg == u'Unauthorized':
                     msg = _(u'Invalid user/account name and/or password.')
                     self.login_form_errors.append(msg)
             except URLError, err:
-                logging.info("url error "+str(vars(err)))
+                logging.info("url error " + str(vars(err)))
                 # if str(err.reason) == 'timed out':
                 # opened this up since some other errors should be reported as well.
                 if err.reason.find('ssl') > -1:
@@ -215,9 +221,8 @@ class LoginView(BaseView, PermissionCheckMixin):
             auth = AWSAuthenticator(package=package, validate_certs=validate_certs, ca_certs=ca_certs_file)
             try:
                 creds = auth.authenticate(timeout=10)
-                logging.info("Authenticated AWS user from {ip}".format(ip=BaseView.get_remote_addr(self.request)))
+                logging.info(u"Authenticated AWS user from {ip}".format(ip=BaseView.get_remote_addr(self.request)))
                 default_region = self.request.registry.settings.get('aws.default.region', 'us-east-1')
-                # self.invalidate_connection_cache()
                 session.invalidate()  # Refresh session
                 session['cloud_type'] = 'aws'
                 session['session_token'] = creds.session_token
@@ -225,12 +230,16 @@ class LoginView(BaseView, PermissionCheckMixin):
                 session['secret_key'] = creds.secret_key
                 last_visited_aws_region = [reg for reg in AWS_REGIONS if reg.get('name') == aws_region]
                 session['region'] = aws_region if last_visited_aws_region else default_region
-                session['username_label'] = '{user}...@AWS'.format(user=creds.access_key[:8])
+                session['username_label'] = u'{user}...@AWS'.format(user=creds.access_key[:8])
                 session['supported_platforms'] = self.get_account_attributes(['supported-platforms'])
                 session['default_vpc'] = self.get_account_attributes(['default-vpc'])
-                # Save EC2 Connection object in cache
-                ConnectionManager.aws_connection(
-                    default_region, creds.access_key, creds.secret_key, creds.session_token, 'ec2')
+                conn = ConnectionManager.aws_connection(
+                    session['region'], creds.access_key, creds.secret_key, creds.session_token, 'vpc')
+                vpcs = conn.get_all_vpcs()
+                if not vpcs or len(vpcs) == 0:
+                    # remove vpc from supported-platforms
+                    if 'VPC' in session.get('supported_platforms', []):
+                        session.get('supported_platforms').remove('VPC')
                 headers = remember(self.request, creds.access_key[:8])
                 return HTTPFound(location=self.came_from, headers=headers)
             except HTTPError, err:
@@ -258,5 +267,4 @@ class LogoutView(BaseView):
         if self.euca_logout_form.validate():
             forget(self.request)
             self.request.session.invalidate()
-            # self.invalidate_connection_cache()
-            return HTTPFound(location=self.login_url)
+        return HTTPFound(location=self.login_url)

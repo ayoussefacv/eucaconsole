@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2013-2014 Eucalyptus Systems, Inc.
+# Copyright 2013-2015 Hewlett Packard Enterprise Development LP
 #
 # Redistribution and use of this software in source and binary forms,
 # with or without modification, are permitted provided that the following
@@ -42,6 +42,7 @@ PLATFORM_CHOICES = [
     PlatformChoice('redhat', r'(rhel|redhat)', 'Red Hat'),
     PlatformChoice('centos', r'centos.5', 'CentOS 5'),
     PlatformChoice('centos', r'centos.6', 'CentOS 6'),
+    PlatformChoice('centos', r'centos.7', 'CentOS 7'),
     PlatformChoice('centos', r'centos', 'CentOS'),
     PlatformChoice('ubuntu', r'(lucid|ubuntu.10[\W\s]04)', 'Ubuntu Lucid (10.04)'),
     PlatformChoice('ubuntu', r'(precise|ubuntu.12[\W\s]04)', 'Ubuntu Precise (12.04)'),

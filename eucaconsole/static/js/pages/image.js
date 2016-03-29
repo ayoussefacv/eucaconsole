@@ -4,7 +4,7 @@
  *
  */
 
-angular.module('ImagePage', ['BlockDeviceMappingEditor', 'TagEditor', 'EucaConsoleUtils'])
+angular.module('ImagePage', ['BlockDeviceMappingEditor', 'TagEditorModule', 'EucaConsoleUtils'])
     .controller('ImagePageCtrl', function ($scope, $http, $timeout, eucaUnescapeJson, eucaHandleError) {
         $scope.imageState = '';
         $scope.imageProgess = 0;
@@ -12,7 +12,7 @@ angular.module('ImagePage', ['BlockDeviceMappingEditor', 'TagEditor', 'EucaConso
         $scope.imageCancelUrl = '';
         $scope.imagesUrl = '';
         $scope.transitionalStates = ['pending', 'storing'];
-        $scope.isPublic = '';
+        $scope.isPublic = false;
         $scope.errorClass= '';
         $scope.launchPermissions = [];
         $scope.isAccountNotTyped = true;
@@ -24,11 +24,13 @@ angular.module('ImagePage', ['BlockDeviceMappingEditor', 'TagEditor', 'EucaConso
         $scope.cancelling = false;
         $scope.initController = function (optionsJson) {
             var options = JSON.parse(eucaUnescapeJson(optionsJson));
-            $scope.isPublic = options['is_public'];
-            $scope.launchPermissions = options['image_launch_permissions'];
-            $scope.imageStatusEndpoint = options['image_state_json_url'];
-            $scope.imageCancelUrl = options['image_cancel_url'];
-            $scope.imagesUrl = options['images_url'];
+            if (options.hasOwnProperty('is_public') && options.is_public === 'true') {
+                $scope.isPublic = true;
+            }
+            $scope.launchPermissions = options.image_launch_permissions;
+            $scope.imageStatusEndpoint = options.image_state_json_url;
+            $scope.imageCancelUrl = options.image_cancel_url;
+            $scope.imagesUrl = options.images_url;
             if ($scope.imageStatusEndpoint) {
                 $scope.getImageState();
             }
@@ -129,7 +131,7 @@ angular.module('ImagePage', ['BlockDeviceMappingEditor', 'TagEditor', 'EucaConso
                     $scope.isAccountValid = true;
                     $scope.$apply();
                 }else{
-                    if ($scope.newAccount == "" || $scope.newAccount.length == 0 || $scope.newAccount == undefined) {
+                    if ($scope.newAccount === '' || $scope.newAccount.length === 0 || $scope.newAccount === undefined) {
                         // If new account ID value is null, consider input being cleared, remove the error message
                         $scope.isAccountValid = true;
                     } else if ($scope.newAccount.length > 12 || $scope.newAccount != parseInt($scope.newAccount)) {
@@ -157,20 +159,20 @@ angular.module('ImagePage', ['BlockDeviceMappingEditor', 'TagEditor', 'EucaConso
             });
         };
         $scope.getImageState = function () {
-            if ($scope.cancelling == true) {
+            if ($scope.cancelling === true) {
                 return;
             }
             $http.post($scope.imageStatusEndpoint).success(function(oData) {
                 var results = oData ? oData.results : '';
                 if (results) {
-                    $scope.imageState = results['image_status'];
-                    $scope.imageProgress = results['progress'];
+                    $scope.imageState = results.image_status;
+                    $scope.imageProgress = results.progress;
                     // Poll to obtain desired end state if current state is transitional
                     if ($scope.isTransitional($scope.imageState)) {
                         $scope.isUpdating = true;
-                        $timeout(function() {$scope.getImageState()}, 4000);  // Poll every 4 seconds
+                        $timeout(function() {$scope.getImageState();}, 4000);  // Poll every 4 seconds
                     } else {
-                        if ($scope.isUpdating == true) {
+                        if ($scope.isUpdating === true && results.url) {
                             // force reload in case image ID got assigned
                             window.location = results.url;
                         }
@@ -194,7 +196,7 @@ angular.module('ImagePage', ['BlockDeviceMappingEditor', 'TagEditor', 'EucaConso
         };
         $scope.addAccount = function () {
            if (!$scope.isAccountNotTyped && $scope.isAccountValid) {
-               if ($scope.hasDup($scope.launchPermissions, $scope.newAccount) != true) {
+               if ($scope.hasDup($scope.launchPermissions, $scope.newAccount) !== true) {
                    $scope.launchPermissions.push($scope.newAccount);
                }
                $scope.newAccount = "";
@@ -219,7 +221,7 @@ angular.module('ImagePage', ['BlockDeviceMappingEditor', 'TagEditor', 'EucaConso
               success(function(oData) {
                 var results = oData ? oData.results : [];
                 // could put data back into form, but form already contains changes
-                if (oData.error == undefined) {
+                if (oData.error === undefined) {
                     Notify.success(oData.message);
                     window.location = $scope.imagesUrl;
                 } else {

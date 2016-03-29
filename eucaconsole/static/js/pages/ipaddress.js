@@ -9,14 +9,14 @@ angular.module('ElasticIPPage', [])
         $scope.publicIP = '';
         $scope.allocationID = '';
         $scope.initController = function (publicIP, allocationID) {
-            $scope.publicIP = publicIP,
+            $scope.publicIP = publicIP;
             $scope.allocationID = allocationID;
             $scope.activateWidget();
             $scope.setWatch();
             $scope.setFocus();
         };
         $scope.activateWidget = function () {
-            $('#instance_id').chosen({'width': '80%'});
+            $('#instance_id').chosen({'width': '80%', search_contains: true});
         };
         $scope.setWatch = function () {
             $(document).on('submit', '[data-reveal] form', function () {
@@ -28,7 +28,7 @@ angular.module('ElasticIPPage', [])
             $(document).on('ready', function(){
                 $('.actions-menu').find('a').get(0).focus();
             });
-            $(document).on('opened', '[data-reveal]', function () {
+            $(document).on('opened.fndtn.reveal', '[data-reveal]', function () {
                 var modal = $(this);
                 var modalID = $(this).attr('id');
                 if( modalID.match(/terminate/)  || modalID.match(/delete/) || modalID.match(/release/) ){

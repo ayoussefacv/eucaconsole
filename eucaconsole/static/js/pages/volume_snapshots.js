@@ -21,7 +21,6 @@ angular.module('VolumeSnapshots', ['TagEditor', 'EucaConsoleUtils'])
             $scope.imagesURL = imagesURL;
             $scope.getVolumeSnapshots();
             $scope.setFocus();
-            $scope.setDropdownMenusListener();
         };
         $scope.revealRegisterSnapshotModal = function (snapshot_id) {
             var modal = $('#register-snapshot-modal');
@@ -31,14 +30,14 @@ angular.module('VolumeSnapshots', ['TagEditor', 'EucaConsoleUtils'])
         $scope.revealDeleteModal = function (volume_id, snapshot) {
             var modal = $('#delete-snapshot-modal');
             $scope.volumeID = volume_id;
-            $scope.snapshotID = snapshot['id'];
-            $scope.snapshotName = snapshot['name'];
+            $scope.snapshotID = snapshot.id;
+            $scope.snapshotName = snapshot.name;
             $scope.images = undefined;
             $scope.getSnapshotImages(snapshot, $scope.imagesURL);
             modal.foundation('reveal', 'open');
         };
         $scope.setFocus = function () {
-            $(document).on('opened', '[data-reveal]', function () {
+            $(document).on('opened.fndtn.reveal', '[data-reveal]', function () {
                 var modal = $(this);
                 var inputElement = modal.find('input[type!=hidden]').get(0);
                 var modalButton = modal.find('button').get(0);
@@ -47,15 +46,6 @@ angular.module('VolumeSnapshots', ['TagEditor', 'EucaConsoleUtils'])
                 } else if (!!modalButton) {
                     modalButton.focus();
                 }
-            });
-        };
-        $scope.setDropdownMenusListener = function () {
-            var modals = $('[data-reveal]');
-            modals.on('open', function () {
-                $('.gridwrapper').find('.f-dropdown').filter('.open').css('display', 'none');
-            });
-            modals.on('close', function () {
-                $('.gridwrapper').find('.f-dropdown').filter('.open').css('display', 'block');
             });
         };
         $scope.getVolumeSnapshots = function () {
@@ -79,8 +69,8 @@ angular.module('VolumeSnapshots', ['TagEditor', 'EucaConsoleUtils'])
             });
         };
         $scope.getSnapshotImages = function (snapshot, url) {
-            var url = url.replace('_id_', snapshot.id)
-            $http.get(url).success(function(oData) {
+            var urlReplaced = url.replace('_id_', snapshot.id);
+            $http.get(urlReplaced).success(function(oData) {
                 var results = oData ? oData.results : '';
                 if (results && results.length > 0) {
                     $scope.images = results;

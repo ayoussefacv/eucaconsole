@@ -7,8 +7,8 @@
 // User status choices are: creating, available, in-use, deleting, deleted, error
 
 // Status colors
-$keys-status-color-active: $euca-darkblue;
-$keys-status-color-inactive: $euca-grey;
+$keys-status-color-active: $hpe-slate;
+$keys-status-color-inactive: $hpe-gray;
 
 
 // ***********
@@ -29,7 +29,7 @@ $keys-status-color-inactive: $euca-grey;
 #breadcrumbs .icon-block { display: none; }
 
 .or-circle {
-    font-size: 1.0rem;
+    font-size: 0.8rem;
     position: absolute;
     top: 30%; right: -22px;
     width: 35px; height: 35px;

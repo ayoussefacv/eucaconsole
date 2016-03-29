@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2013-2014 Eucalyptus Systems, Inc.
+# Copyright 2013-2015 Hewlett Packard Enterprise Development LP
 #
 # Redistribution and use of this software in source and binary forms,
 # with or without modification, are permitted provided that the following
@@ -33,21 +33,28 @@ IMPORTANT: All forms needing CSRF protection should inherit from BaseSecureForm
 import logging
 import pylibmc
 import sys
+import os
 
+from defusedxml import ElementTree
+from markupsafe import escape
 from wtforms import StringField
 from wtforms.ext.csrf import SecureForm
 from wtforms.widgets import html_params, HTMLString, Select
-from markupsafe import escape
 
 from boto.exception import BotoServerError
 
 from ..caches import extra_long_term
 from ..caches import invalidate_cache
+from ..constants.elbs import ELB_PREDEFINED_SECURITY_POLICY_NAME_PREFIX
 from ..constants.instances import AWS_INSTANCE_TYPE_CHOICES
 from ..i18n import _
 
 
 BLANK_CHOICE = ('', _(u'Select...'))
+ASCII_WITHOUT_SLASHES_NOTICE = _(
+    u'Name is required and must be between 1 and 255 ASCII characters long and may not contain slashes')
+NAME_WITHOUT_SPACES_NOTICE = _(
+    u'Name must be between 1 and 255 characters long, and must not contain spaces')
 
 
 class NgNonBindableOptionSelect(Select):
@@ -63,7 +70,10 @@ class NgNonBindableOptionSelect(Select):
 class BaseSecureForm(SecureForm):
     def __init__(self, request, **kwargs):
         self.request = request
+        self.region = request.session.get('region')
         super(BaseSecureForm, self).__init__(**kwargs)
+        if hasattr(request, 'session'):
+            self.cloud_type = request.session.get('cloud_type', 'euca')
 
     def generate_csrf_token(self, csrf_context):
         return self.request.session.get_csrf_token() if hasattr(self.request, 'session') else ''
@@ -74,9 +84,15 @@ class BaseSecureForm(SecureForm):
         error_messages = []
         for field, errors in self.errors.items():
             field_errors = BaseView.escape_braces(', '.join(errors))
-            msg = '{0}: {1}'.format(field, field_errors)
+            msg = u'{0}: {1}'.format(field, field_errors)
             error_messages.append(msg)
         return error_messages
+
+    @staticmethod
+    def get_options_from_choices(choices):
+        if choices is None:
+            return []
+        return [{'key': choice[0], 'label':choice[1]} for choice in choices]
 
 
 class TextEscapedField(StringField):
@@ -122,10 +138,13 @@ class ChoicesManager(object):
             zones = []
             if self.conn is not None:
                 zones = self.conn.get_all_zones()
+            for zone in zones:
+                del zone.connection
+                del zone.region
             return zones
         try:
             return _get_zones_cache_(self, region)
-        except pylibmc.Error as err:
+        except pylibmc.Error:
             return _get_zones_(self, region)
 
     def instances(self, instances=None, states=None, escapebraces=True):
@@ -143,7 +162,7 @@ class ChoicesManager(object):
                     else:
                         if instance.state in states:
                             choices.append((value, label))
-     
+
         return choices
 
     @staticmethod
@@ -168,10 +187,13 @@ class ChoicesManager(object):
                 types = []
                 if self.conn is not None:
                     types = self.conn.get_all_instance_types()
+                for inst_type in types:
+                    del inst_type.connection
+                    del inst_type.region
                 return types
             try:
                 types.extend(_get_instance_types_cache_(self))
-            except pylibmc.Error as err:
+            except pylibmc.Error:
                 types.extend(_get_instance_types_(self))
             choices = []
             for vmtype in types:
@@ -354,6 +376,27 @@ class ChoicesManager(object):
                 raise ex
         return sorted(choices)
 
+    def predefined_policy_choices(self, add_blank=True):
+        """Boto 2 doesn't offer a DescribeLoadBalancerPolicies API method, so we'll need to use a lower-level call"""
+        choices = []
+        if add_blank:
+            choices.append(BLANK_CHOICE)
+        if self.conn is not None:
+            xml_prefix = '{http://elasticloadbalancing.amazonaws.com/doc/2012-12-01/}'
+            resp = self.conn.make_request('DescribeLoadBalancerPolicies')
+            root = ElementTree.fromstring(resp.read())
+            policy_descriptions = root.find('.//{0}PolicyDescriptions'.format(xml_prefix))
+            policies = policy_descriptions.getchildren() if policy_descriptions is not None else []
+            for policy in policies:
+                policy_type = policy.find('.//{0}PolicyTypeName'.format(xml_prefix))
+                if policy_type is not None and policy_type.text == 'SSLNegotiationPolicyType':
+                    policy_name = policy.find('.//{0}PolicyName'.format(xml_prefix)).text
+                    if policy_name.startswith(ELB_PREDEFINED_SECURITY_POLICY_NAME_PREFIX):
+                        choices.append((policy_name, policy_name))
+        if choices:
+            choices = reversed(sorted(set(choices)))
+        return list(choices)
+
     # IAM options
 
     def roles(self, roles=None, add_blank=True, escapebraces=True):
@@ -402,7 +445,7 @@ class ChoicesManager(object):
 
     # VPC connection type choices
 
-    def vpc_networks(self, vpc_networks=None, add_blank=True,  escapebraces=True):
+    def vpc_networks(self, vpc_networks=None, add_blank=True, escapebraces=True):
         from ..views import TaggedItemView
         choices = []
         if add_blank:
@@ -428,8 +471,48 @@ class ChoicesManager(object):
         for vpc in vpc_subnet_list:
             if show_zone:
                 # Format the VPC subnet display string for select options
-                subnet_string = '{0} ({1}) | {2}'.format(vpc.cidr_block, vpc.id, vpc.availability_zone)
+                subnet_string = u'{0} ({1}) | {2}'.format(vpc.cidr_block, vpc.id, vpc.availability_zone)
                 choices.append((vpc.id, subnet_string))
             else:
                 choices.append((vpc.id, vpc.cidr_block))
         return sorted(set(choices))
+
+
+class CFSampleTemplateManager(object):
+
+    def __init__(self, s3_bucket):
+        self.s3_bucket = s3_bucket
+
+    def get_template_options(self):
+        templates = []
+        for cat in self._get_templates_():
+            templates.extend([{'name': opt, 'label': label, 'group': cat[1]} for (label, opt) in cat[2]])
+        return templates
+
+    def get_template_list(self):
+        templates = [(directory, files) for (directory, category, files) in self._get_templates_()]
+        return templates
+
+    def _get_templates_(self):
+        templates = []
+        self.template_dir = os.path.join(os.getcwd(), 'eucaconsole/cf-templates')
+        if not os.path.exists(self.template_dir) and os.path.exists('/usr/share/eucaconsole/cf-templates'):
+            self.template_dir = '/usr/share/eucaconsole/cf-templates'
+        euca_templates = []
+        for dir_name, subdir_list, filelist in os.walk(self.template_dir):
+            for file_item in filelist:
+                name = file_item
+                if file_item.find('.') > -1:
+                    name = file_item[:file_item.find('.')]
+                euca_templates.append((name, file_item))
+            if len(euca_templates) > 0:
+                templates.append((dir_name, dir_name[dir_name.rindex('/') + 1:], euca_templates))
+        if self.s3_bucket is not None:
+            admin_templates = []
+            bucket_items = self.s3_bucket.list()
+            for key in bucket_items:
+                name = key.name[:key.name.index('.')]
+                admin_templates.append((name, key.name))
+            if len(admin_templates) > 0:
+                templates.append(('s3', _(u'Local'), admin_templates))
+        return templates

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2013-2014 Eucalyptus Systems, Inc.
+# Copyright 2013-2015 Hewlett Packard Enterprise Development LP
 #
 # Redistribution and use of this software in source and binary forms,
 # with or without modification, are permitted provided that the following
@@ -25,7 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 """
-Forms for Key Pairs 
+Forms for Key Pairs
 
 """
 import wtforms
@@ -38,7 +38,7 @@ from . import BaseSecureForm
 class KeyPairForm(BaseSecureForm):
     """Key Pair Create form
     """
-    name_error_msg = _(u'Keypair name must be between 1 and 255 characters long, and must not contain \'/\' and \'\\\'')
+    name_error_msg = _(u'Keypair name must be between 1 and 255 ASCII characters long')
     name = wtforms.TextField(
         id=u'key-name',
         label=_(u'Name'),

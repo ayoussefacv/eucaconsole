@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2013-2014 Eucalyptus Systems, Inc.
+# Copyright 2013-2015 Hewlett Packard Enterprise Development LP
 #
 # Redistribution and use of this software in source and binary forms,
 # with or without modification, are permitted provided that the following
@@ -28,9 +28,10 @@
 Pyramid views for Eucalyptus and AWS launch configurations
 
 """
-from urllib import quote
 import simplejson as json
+from urllib import quote, urlencode
 
+from boto.exception import BotoServerError
 from boto.ec2.autoscale.launchconfig import LaunchConfiguration
 
 from pyramid.httpexceptions import HTTPFound
@@ -54,8 +55,9 @@ from . import guess_mimetype_from_buffer
 class LaunchConfigsView(LandingPageView):
     def __init__(self, request):
         super(LaunchConfigsView, self).__init__(request)
-        self.request = request
+        self.title_parts = [_(u'Launch Configs')]
         self.ec2_conn = self.get_connection()
+        self.autoscale_conn = self.get_connection(conn_type='autoscale')
         self.iam_conn = self.get_connection(conn_type="iam")
         self.autoscale_conn = self.get_connection(conn_type='autoscale')
         self.initial_sort_key = 'name'
@@ -65,11 +67,16 @@ class LaunchConfigsView(LandingPageView):
         self.json_items_endpoint = self.get_json_endpoint('launchconfigs_json')
         self.delete_form = LaunchConfigDeleteForm(self.request, formdata=self.request.params or None)
         self.filters_form = LaunchConfigsFiltersForm(
-            self.request, cloud_type=self.cloud_type, ec2_conn=self.ec2_conn, formdata=self.request.params or None)
+            self.request,
+            cloud_type=self.cloud_type,
+            ec2_conn=self.ec2_conn,
+            autoscale_conn=self.autoscale_conn,
+            formdata=self.request.params or None
+        )
+        search_facets = self.filters_form.facets
         self.render_dict = dict(
-            filter_fields=True,
-            filters_form=self.filters_form,
             filter_keys=self.filter_keys,
+            search_facets=BaseView.escape_json(json.dumps(search_facets)),
             sort_keys=self.sort_keys,
             prefix=self.prefix,
             initial_sort_key=self.initial_sort_key,
@@ -88,12 +95,11 @@ class LaunchConfigsView(LandingPageView):
             name = self.request.params.get('name')
             location = self.request.route_path('launchconfigs')
             prefix = _(u'Unable to delete launch configuration')
-            template = '{0} {1} - {2}'.format(prefix, name, '{0}')
+            template = u'{0} {1} - {2}'.format(prefix, name, u'{0}')
             with boto_error_handler(self.request, location, template):
-                launch_config = self.autoscale_conn.get_all_launch_configurations(names=[name])
                 self.autoscale_conn.delete_launch_configuration(name)
                 prefix = _(u'Successfully deleted launch configuration.')
-                msg = '{0} {1}'.format(prefix, name)
+                msg = u'{0} {1}'.format(prefix, name)
                 queue = Notification.SUCCESS
                 notification_msg = msg
                 self.request.session.flash(notification_msg, queue=queue)
@@ -125,6 +131,7 @@ class LaunchConfigsJsonView(LandingPageView):
         with boto_error_handler(request):
             self.items = self.get_items()
             self.securitygroups = self.get_all_security_groups()
+            self.scaling_groups = self.autoscale_conn.get_all_groups()
 
     @view_config(route_name='launchconfigs_json', renderer='json', request_method='POST')
     def launchconfigs_json(self):
@@ -134,24 +141,34 @@ class LaunchConfigsJsonView(LandingPageView):
             launchconfigs_array = []
             launchconfigs_image_mapping = self.get_launchconfigs_image_mapping()
             scalinggroup_launchconfig_names = self.get_scalinggroups_launchconfig_names()
+            launchconfig_sg_mapping = self.get_launchconfigs_sg_mapping()
             for launchconfig in self.filter_items(self.items):
                 security_groups = self.get_security_groups(launchconfig.security_groups)
                 security_groups_array = sorted({
                     'name': group.name,
                     'id': group.id,
                     'rules_count': self.get_security_group_rules_count_by_id(group.id)
-                    } for group in security_groups)
+                } for group in security_groups)
                 image_id = launchconfig.image_id
                 name = launchconfig.name
+                image_name = ''
+                root_device_type = ''
+                image = launchconfigs_image_mapping.get(image_id)
+                if image:
+                    image_name = image.get('name')
+                    root_device_type = image.get('root_device_type')
                 launchconfigs_array.append(dict(
                     created_time=self.dt_isoformat(launchconfig.created_time),
                     image_id=image_id,
-                    image_name=launchconfigs_image_mapping.get(image_id),
+                    image_name=image_name,
+                    instance_type=launchconfig.instance_type,
                     instance_monitoring=launchconfig.instance_monitoring.enabled == 'true',
                     key_name=launchconfig.key_name,
                     name=name,
                     security_groups=security_groups_array,
+                    root_device_type=root_device_type,
                     in_use=name in scalinggroup_launchconfig_names,
+                    scaling_group=launchconfig_sg_mapping.get(name)
                 ))
             return dict(results=launchconfigs_array)
 
@@ -160,16 +177,27 @@ class LaunchConfigsJsonView(LandingPageView):
 
     def get_launchconfigs_image_mapping(self):
         launchconfigs_image_ids = [launchconfig.image_id for launchconfig in self.items]
-        launchconfigs_images = self.ec2_conn.get_all_images(image_ids=launchconfigs_image_ids) if self.ec2_conn else []
+        launchconfigs_image_ids = list(set(launchconfigs_image_ids))
+        try:
+            launchconfigs_images = self.ec2_conn.get_all_images(image_ids=launchconfigs_image_ids) if self.ec2_conn else []
+        except BotoServerError:
+            return dict()
         launchconfigs_image_mapping = dict()
         for image in launchconfigs_images:
-            launchconfigs_image_mapping[image.id] = image.name or image.id
+            launchconfigs_image_mapping[image.id] = dict(
+                name=image.name or image.id,
+                root_device_type=image.root_device_type
+            )
         return launchconfigs_image_mapping
 
     def get_scalinggroups_launchconfig_names(self):
-        if self.autoscale_conn:
-            return [group.launch_config_name for group in self.autoscale_conn.get_all_groups()]
-        return []
+        return [group.launch_config_name for group in self.scaling_groups]
+
+    def get_launchconfigs_sg_mapping(self):
+        ret = dict()
+        for sg in self.scaling_groups:
+            ret[sg.launch_config_name] = sg.name
+        return ret
 
     def get_all_security_groups(self):
         if self.ec2_conn:
@@ -188,18 +216,18 @@ class LaunchConfigsJsonView(LandingPageView):
                 else:
                     security_group = self.get_security_group_by_name(id)
                 if security_group:
-                    security_groups.append(security_group) 
+                    security_groups.append(security_group)
         return security_groups
 
     def get_security_group_by_id(self, id):
-        if self.securitygroups: 
+        if self.securitygroups:
             for sgroup in self.securitygroups:
                 if sgroup.id == id:
                     return sgroup
         return ''
 
     def get_security_group_by_name(self, name):
-        if self.securitygroups: 
+        if self.securitygroups:
             for sgroup in self.securitygroups:
                 if sgroup.name == name:
                     return sgroup
@@ -212,7 +240,8 @@ class LaunchConfigsJsonView(LandingPageView):
             security_group = self.get_security_group_by_name(id)
         if security_group:
             return len(security_group.rules)
-        return None 
+        return None
+
 
 class LaunchConfigView(BaseView):
     """Views for single LaunchConfig"""
@@ -220,6 +249,7 @@ class LaunchConfigView(BaseView):
 
     def __init__(self, request):
         super(LaunchConfigView, self).__init__(request)
+        self.title_parts = [_(u'Launch Config'), request.matchdict.get('id')]
         self.ec2_conn = self.get_connection()
         self.iam_conn = self.get_connection(conn_type="iam")
         self.autoscale_conn = self.get_connection(conn_type='autoscale')
@@ -232,7 +262,10 @@ class LaunchConfigView(BaseView):
         self.role = None
         if self.launch_config and self.launch_config.instance_profile_name:
             arn = self.launch_config.instance_profile_name
-            profile_name = arn[(arn.rindex('/')+1):]
+            try:
+                profile_name = arn[(arn.rindex('/') + 1):]
+            except ValueError:
+                profile_name = arn
             inst_profile = self.iam_conn.get_instance_profile(profile_name)
             self.role = inst_profile.roles.member.role_name
 
@@ -240,11 +273,11 @@ class LaunchConfigView(BaseView):
             user_data = self.launch_config.user_data
             mime_type = guess_mimetype_from_buffer(user_data, mime=True)
             if mime_type.find('text') == 0:
-                self.launch_config.user_data=user_data
+                self.launch_config.user_data = user_data
             else:
                 # get more descriptive text
                 mime_type = guess_mimetype_from_buffer(user_data)
-                self.launch_config.user_data=None
+                self.launch_config.user_data = None
             self.launch_config.userdata_type = mime_type
             self.launch_config.userdata_istext = True if mime_type.find('text') >= 0 else False
         else:
@@ -257,7 +290,7 @@ class LaunchConfigView(BaseView):
             launch_config_vpc_ip_assignment=self.get_vpc_ip_assignment_display(
                 self.launch_config.associate_public_ip_address) if self.launch_config else '',
             lc_created_time=self.dt_isoformat(self.launch_config.created_time),
-            escaped_launch_config_name=quote(self.launch_config.name),
+            escaped_launch_config_name=quote(self.launch_config.name.encode('utf-8')),
             in_use=self.in_use,
             image=self.image,
             security_groups=self.security_groups,
@@ -270,19 +303,19 @@ class LaunchConfigView(BaseView):
     @view_config(route_name='launchconfig_view', renderer=TEMPLATE)
     def launchconfig_view(self):
         return self.render_dict
- 
+
     @view_config(route_name='launchconfig_delete', request_method='POST', renderer=TEMPLATE)
     def launchconfig_delete(self):
         if self.delete_form.validate():
             name = self.request.params.get('name')
             location = self.request.route_path('launchconfigs')
             prefix = _(u'Unable to delete launch configuration')
-            template = '{0} {1} - {2}'.format(prefix, self.launch_config.name, '{0}')
+            template = u'{0} {1} - {2}'.format(prefix, self.launch_config.name, '{0}')
             with boto_error_handler(self.request, location, template):
                 self.log_request(_(u"Deleting launch configuration {0}").format(name))
                 self.autoscale_conn.delete_launch_configuration(name)
                 prefix = _(u'Successfully deleted launch configuration.')
-                msg = '{0} {1}'.format(prefix, name)
+                msg = u'{0} {1}'.format(prefix, name)
                 self.request.session.flash(msg, queue=Notification.SUCCESS)
             return HTTPFound(location=location)
         else:
@@ -298,7 +331,10 @@ class LaunchConfigView(BaseView):
 
     def get_image(self):
         if self.ec2_conn:
-            images = self.ec2_conn.get_all_images(image_ids=[self.launch_config.image_id])
+            try:
+                images = self.ec2_conn.get_all_images(image_ids=[self.launch_config.image_id])
+            except BotoServerError:
+                return None
             image = images[0] if images else None
             if image is None:
                 return None
@@ -339,10 +375,10 @@ class LaunchConfigView(BaseView):
                 sgroup_dict = {}
                 sgroup_dict['id'] = sgroup.id
                 sgroup_dict['name'] = sgroup.name
-                sgroup_dict['rules'] = rules 
-                sgroup_dict['rule_count'] = len(rules) 
+                sgroup_dict['rules'] = rules
+                sgroup_dict['rule_count'] = len(rules)
                 security_group_list.append(sgroup_dict)
-        return security_group_list 
+        return security_group_list
 
     def is_in_use(self):
         """Returns whether or not the launch config is in use (i.e. in any scaling group).
@@ -356,8 +392,8 @@ class LaunchConfigView(BaseView):
     @staticmethod
     def get_vpc_ip_assignment_display(value):
         choices = [
-            ('None', _(u'Only for instances in default VPC & subnet')), 
-            ('True', _(u'For all instances')), 
+            ('None', _(u'Only for instances in default VPC & subnet')),
+            ('True', _(u'For all instances')),
             ('False', _(u'Never'))
         ]
         for choice in choices:
@@ -378,7 +414,7 @@ class CreateLaunchConfigView(BlockDeviceMappingItemView):
 
     def __init__(self, request):
         super(CreateLaunchConfigView, self).__init__(request)
-        self.request = request
+        self.title_parts = [_(u'Launch Config'), _(u'Create')]
         self.image = self.get_image()
         with boto_error_handler(request):
             self.securitygroups = self.get_security_groups()
@@ -478,8 +514,10 @@ class CreateLaunchConfigView(BlockDeviceMappingItemView):
                 self.request.session.flash(msg, queue=queue)
 
             if self.request.params.get('create_sg_from_lc') == 'y':
-                escaped_name = quote(name)
-                location = self.request.route_path('scalinggroup_new')+("?launch_config={0}".format(escaped_name))
+                location = u'{0}?{1}'.format(
+                    self.request.route_path('scalinggroup_new'),
+                    urlencode(self.encode_unicode_dict({'launch_config': name}))
+                )
             return HTTPFound(location=location)
         else:
             self.request.error_messages = self.create_form.get_errors_list()
@@ -496,7 +534,7 @@ class CreateLaunchConfigView(BlockDeviceMappingItemView):
             rules = SecurityGroupsView.get_rules(security_group.rules)
             if security_group.vpc_id is not None:
                 rules_egress = SecurityGroupsView.get_rules(security_group.rules_egress, rule_type='outbound')
-                rules = rules + rules_egress 
+                rules = rules + rules_egress
             rules_dict[security_group.id] = rules
         return rules_dict
 
@@ -515,3 +553,72 @@ class CreateLaunchConfigView(BlockDeviceMappingItemView):
             else:
                 return default_vpc[0]
         return 'None'
+
+
+class CreateMoreLaunchConfigView(BlockDeviceMappingItemView):
+    """Create another Launch Configuration like this one"""
+    TEMPLATE = '../templates/launchconfigs/launchconfig_create_more.pt'
+
+    def __init__(self, request):
+        super(CreateMoreLaunchConfigView, self).__init__(request)
+        self.request = request
+        self.iam_conn = None
+        if BaseView.has_role_access(request):
+            self.iam_conn = self.get_connection(conn_type="iam")
+        self.vpc_conn = self.get_connection(conn_type='vpc')
+        autoscale_conn = self.get_connection(conn_type='autoscale')
+        name = self.request.matchdict.get('id')
+        with boto_error_handler(request):
+            lc = autoscale_conn.get_all_launch_configurations(names=[name])
+            launch_config = lc[0]
+            images = self.get_connection().get_all_images(image_ids=[launch_config.image_id])
+            self.image = images[0] if images else None
+            self.image.platform_name = ImageView.get_platform(self.image)[2]
+
+        self.create_form = CreateLaunchConfigForm(
+            self.request, image=self.image, conn=self.conn, iam_conn=self.iam_conn,
+            keyname=launch_config.key_name,
+            formdata=self.request.params or None)
+        self.create_form.image_id.data = launch_config.image_id
+        self.create_form.instance_type.data = launch_config.instance_type
+        self.create_form.securitygroup.data = launch_config.security_groups
+        self.filters_form = ImagesFiltersForm(
+            self.request, cloud_type=self.cloud_type, formdata=self.request.params or None)
+        self.keypair_form = KeyPairForm(self.request, formdata=self.request.params or None)
+        self.securitygroup_form = SecurityGroupForm(self.request, self.vpc_conn, formdata=self.request.params or None)
+        self.generate_file_form = GenerateFileForm(self.request, formdata=self.request.params or None)
+        self.owner_choices = self.get_owner_choices()
+
+        if launch_config.user_data is not None and launch_config.user_data != '':
+            user_data = launch_config.user_data
+            mime_type = guess_mimetype_from_buffer(user_data, mime=True)
+        else:
+            user_data = ''
+            mime_type = ''
+
+        controller_options_json = BaseView.escape_json(json.dumps({
+            'user_data': dict(type=mime_type, data=user_data)
+        }))
+        self.is_vpc_supported = BaseView.is_vpc_supported(request)
+
+        self.render_dict = dict(
+            image=self.image,
+            launch_config=launch_config,
+            launchconfig_name=launch_config.name,
+            create_form=self.create_form,
+            filters_form=self.filters_form,
+            keypair_form=self.keypair_form,
+            securitygroup_form=self.securitygroup_form,
+            generate_file_form=self.generate_file_form,
+            owner_choices=self.owner_choices,
+            snapshot_choices=self.get_snapshot_choices(),
+            preset='',
+            security_group_placeholder_text=_(u'Select...'),
+            controller_options_json=controller_options_json,
+            is_vpc_supported=self.is_vpc_supported,
+        )
+
+    @view_config(route_name='launchconfig_more', renderer=TEMPLATE, request_method='GET')
+    def launchconfig_more(self):
+        return self.render_dict
+

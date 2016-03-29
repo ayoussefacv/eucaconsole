@@ -5,25 +5,18 @@
 @import "../includes/eucavariables";
 
 #image-picker {
-    .search-filter {
-        position: relative;
-        .search-icon {
-            position: absolute;
-            top: 10px; right: 10px;
-        }
-    }
     .table {
         width: 100% !important;
-        border: 1px solid $euca-lightgrey;
+        border: 1px solid $hpe-lightgray;
         tbody {
             display: block;
             overflow-y: scroll;
             height: 22rem;
             tr {
                 display: block;
-                border-bottom: 1px solid $euca-lightgrey;
+                border-bottom: 1px solid $hpe-lightgray;
                 &.selected {
-                    background-color: $euca-extralightgreen;
+                    background-color: $hpe-hovergray;
                 }
                 &.selected:hover {
                     cursor: inherit;
@@ -68,10 +61,10 @@
         .label {
             padding: 3px 4px;
             &.i386 {
-                background-color: lighten($euca-darkgrey, 15%);
+                background-color: $hpe-turq;
             }
             &.x86_64 {
-                background-color: $euca-notificationblue;
+                background-color: $hpe-bronze;
             }
         }
     }
@@ -82,5 +75,13 @@
     label {
         margin-top: 8px;
         margin-bottom: 2px;
+    }
+}
+
+.search-entry {
+    .search-input {
+        // Adjustments for magic search bar
+        height: 1.5rem !important;
+        line-height: 1.5rem !important;
     }
 }

@@ -25,18 +25,18 @@ angular.module('InstancePage', ['TagEditor', 'EucaConsoleUtils'])
         };
         $scope.initController = function (optionsJson) {
             var options = JSON.parse(eucaUnescapeJson(optionsJson));
-            $scope.instanceStateEndpoint = options['instance_state_json_url'];
-            $scope.instanceUserDataEndpoint = options['instance_userdata_json_url'];
-            $scope.instanceIPAddressEndpoint = options['instance_ip_address_json_url'];
-            $scope.consoleOutputEndpoint = options['instance_console_json_url'];
-            $scope.instanceState = options['instance_state'];
-            $scope.instanceID = options['instance_id'];
-            $scope.instancePublicIP = options['instance_ip_address'];
-            $scope.publicDNS = options['instance_public_dns'];
-            $scope.platform = options['instance_platform'];
-            $scope.securityGroups = options['instance_security_groups'];
-            $scope.keyName = options['instance_keypair'];
-            $scope.hasElasticIP = options['has_elastic_ip'];
+            $scope.instanceStateEndpoint = options.instance_state_json_url;
+            $scope.instanceUserDataEndpoint = options.instance_userdata_json_url;
+            $scope.instanceIPAddressEndpoint = options.instance_ip_address_json_url;
+            $scope.consoleOutputEndpoint = options.instance_console_json_url;
+            $scope.instanceState = options.instance_state;
+            $scope.instanceID = options.instance_id;
+            $scope.instancePublicIP = options.instance_ip_address;
+            $scope.publicDNS = options.instance_public_dns;
+            $scope.platform = options.instance_platform;
+            $scope.securityGroups = options.instance_security_groups;
+            $scope.keyName = options.instance_keypair;
+            $scope.hasElasticIP = options.has_elastic_ip;
             $scope.getInstanceState();
             $scope.getUserData();
             $scope.activateWidget();
@@ -45,7 +45,7 @@ angular.module('InstancePage', ['TagEditor', 'EucaConsoleUtils'])
             $('#file').on('change', $scope.getPassword);
         };
         $scope.activateWidget = function () {
-            $('#associate-ip-to-instance-modal').on('open', function(){
+            $('#associate-ip-to-instance-modal').on('open.fndtn.reveal', function(){
                 var thisSelect = $(this).find('#ip_address');
                 thisSelect.chosen({'width': '80%', 'search_contains': true});
             });
@@ -60,7 +60,7 @@ angular.module('InstancePage', ['TagEditor', 'EucaConsoleUtils'])
             else {
                 window.location = '/instances/' + instance_id + '/createimage';
             }
-        }
+        };
         $scope.revealConsoleOutputModal = function() {
             $('.actions-menu').trigger('click');
             $scope.consoleOutput = '';
@@ -78,7 +78,7 @@ angular.module('InstancePage', ['TagEditor', 'EucaConsoleUtils'])
             $(document).on('ready', function(){
                 $('.tabs').find('a').get(0).focus();
             });
-            $(document).on('opened', '[data-reveal]', function () {
+            $(document).on('opened.fndtn.reveal', '[data-reveal]', function () {
                 var modal = $(this);
                 var modalID = $(this).attr('id');
                 if (modalID.match(/terminate/) || modalID.match(/delete/) || 
@@ -209,7 +209,7 @@ angular.module('InstancePage', ['TagEditor', 'EucaConsoleUtils'])
                 // Poll to obtain desired end state if current state is transitional
                 if ($scope.isTransitional($scope.instanceState)) {
                     $scope.isUpdating = true;
-                    $timeout(function() {$scope.getInstanceState()}, 4000);  // Poll every 4 seconds
+                    $timeout(function() {$scope.getInstanceState();}, 4000);  // Poll every 4 seconds
                 } else {
                     $scope.isUpdating = false;
                 }
@@ -280,13 +280,13 @@ angular.module('InstancePage', ['TagEditor', 'EucaConsoleUtils'])
                       }).
                       error(function (oData, status) {
                         if (status == 403) window.location = '/';
-                        var errorMsg = oData['message'] || '';
+                        var errorMsg = oData.message || '';
                         Notify.failure(errorMsg);
                       });
                 }
-            }
+            };
             reader.readAsText(file);
-        }
+        };
     })
 ;
 

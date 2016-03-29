@@ -8,8 +8,8 @@ angular.module('LaunchConfigPage', ['BlockDeviceMappingEditor', 'EucaConsoleUtil
     .controller('LaunchConfigPageCtrl', function ($scope, eucaUnescapeJson) {
         $scope.initController = function (optionsJson) {
             var options = JSON.parse(eucaUnescapeJson(optionsJson));
-            $scope.launchConfigInUse = options['in_use'];
-            $scope.hasImage = options['has_image'];
+            $scope.launchConfigInUse = options.in_use;
+            $scope.hasImage = options.has_image;
             $scope.setWatch();
             $scope.setFocus();
             if (!$scope.hasImage) {
@@ -26,7 +26,7 @@ angular.module('LaunchConfigPage', ['BlockDeviceMappingEditor', 'EucaConsoleUtil
             $(document).on('ready', function(){
                 $('.actions-menu').find('a').get(0).focus();
             });
-            $(document).on('opened', '[data-reveal]', function () {
+            $(document).on('opened.fndtn.reveal', '[data-reveal]', function () {
                 var modal = $(this);
                 var modalID = $(this).attr('id');
                 if( modalID.match(/terminate/)  || modalID.match(/delete/) || modalID.match(/release/) ){

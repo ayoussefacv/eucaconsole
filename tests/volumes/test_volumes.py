@@ -1,4 +1,4 @@
-# Copyright 2013-2014 Eucalyptus Systems, Inc.
+# Copyright 2013-2015 Hewlett Packard Enterprise Development LP
 #
 # Redistribution and use of this software in source and binary forms,
 # with or without modification, are permitted provided that the following
@@ -29,6 +29,9 @@ Volumes tests
 See http://docs.pylonsproject.org/projects/pyramid/en/latest/narr/testing.html
 
 """
+from boto.ec2 import connect_to_region
+from moto import mock_ec2
+
 from pyramid import testing
 from pyramid.httpexceptions import HTTPNotFound
 
@@ -36,9 +39,18 @@ from eucaconsole.forms import BaseSecureForm
 from eucaconsole.forms.volumes import (
     VolumeForm, DeleteVolumeForm, CreateSnapshotForm, DeleteSnapshotForm, AttachForm, DetachForm)
 from eucaconsole.views import TaggedItemView
-from eucaconsole.views.volumes import VolumesView, VolumeView
+from eucaconsole.views.volumes import VolumesView, VolumeView, VolumeStateView, VolumeSnapshotsView
 
 from tests import BaseViewTestCase, BaseFormTestCase
+
+
+class MockVolumeMixin(object):
+    @staticmethod
+    @mock_ec2
+    def make_volume(size=1, zone='us-east-1a'):
+        ec2_conn = connect_to_region('us-east-1')
+        volume = ec2_conn.create_volume(size, zone)
+        return volume, ec2_conn
 
 
 class VolumesViewTests(BaseViewTestCase):
@@ -73,6 +85,7 @@ class VolumeViewTests(BaseViewTestCase):
     def test_volume_update_view(self):
         """Volume update should contain the volume form"""
         request = testing.DummyRequest(post=True)
+        request.POST = {}
         view = VolumeView(request).volume_update()
         self.assertTrue(view.get('volume_form') is not None)
 
@@ -177,3 +190,52 @@ class VolumeDeleteSnapshotFormTestCase(BaseFormTestCase):
     def test_secure_form(self):
         self.has_field('csrf_token')
         self.assertTrue(issubclass(self.form_class, BaseSecureForm))
+
+
+class MockVolumeViewTestCase(BaseViewTestCase, MockVolumeMixin):
+
+    @mock_ec2
+    def test_volume_detail_view_with_existing_volume(self):
+        volume, conn = self.make_volume()
+        request = self.create_request(matchdict=dict(id=volume.id))
+        view = VolumeView(request, ec2_conn=conn).volume_view()
+        self.assertEqual(view.get('volume').id, volume.id)
+        self.assertEqual(view.get('volume_name'), volume.id)
+
+    @mock_ec2
+    def test_volume_detail_view_with_new_volume(self):
+        volume, conn = self.make_volume()
+        request = self.create_request(matchdict=dict(id='new'))
+        view = VolumeView(request, ec2_conn=conn).volume_view()
+        self.assertEqual(view.get('volume'), None)
+
+
+class MockVolumeStateViewTestCase(BaseViewTestCase, MockVolumeMixin):
+
+    @mock_ec2
+    def test_volume_state_view(self):
+        volume, conn = self.make_volume()
+        request = self.create_request(matchdict=dict(id=volume.id))
+        view = VolumeStateView(request=request, ec2_conn=conn).volume_state_json()
+        results = view.get('results')
+        self.assertEqual(results.get('attach_device'), None)
+        self.assertEqual(results.get('attach_instance'), None)
+        self.assertEqual(results.get('attach_status'), None)
+        self.assertEqual(results.get('attach_time'), None)
+        self.assertEqual(results.get('volume_status'), u'available')
+
+
+class MockVolumeSnapshotsViewTestCase(BaseViewTestCase, MockVolumeMixin):
+
+    @mock_ec2
+    def test_volume_snapshots_json_view(self):
+        volume, conn = self.make_volume()
+        snapshot_description = 'a test snapshot for a mock volume'
+        new_snapshot = conn.create_snapshot(volume.id, description=snapshot_description)
+        request = self.create_request(matchdict=dict(id=volume.id))
+        view = VolumeSnapshotsView(request=request, ec2_conn=conn).volume_snapshots_json()
+        results = view.get('results')
+        self.assertEqual(len(results), 1)
+        snapshot = results[0]
+        self.assertEqual(snapshot.get('description'), snapshot_description)
+        self.assertEqual(snapshot.get('name'), new_snapshot.id)
