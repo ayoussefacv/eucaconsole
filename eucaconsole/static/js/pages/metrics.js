@@ -278,6 +278,22 @@ angular.module('MetricsPage', ['LandingPage', 'CloudWatchCharts', 'EucaConsoleUt
                 ModalService.openModal('createAlarm');
             });
         };
+        vm.distributeMouseOver = function($event) {
+            var charts = $('.chart-wrapper').toArray();
+            charts.forEach(function(chart) {
+                if ($(chart).find($event.relatedTarget) === undefined) {
+                    var $el = $(chart).find('svg');
+                    var offset = $el.offset();
+                    var event = $.Event('mouseover', {
+                        which: 1,
+                        pageX: offset.left,
+                        pageY: offset.top
+                    });
+                    $el.trigger(event);
+                }
+            });
+            
+        };
     })
 ;
 
