@@ -279,17 +279,26 @@ angular.module('MetricsPage', ['LandingPage', 'CloudWatchCharts', 'EucaConsoleUt
             });
         };
         vm.distributeMouseOver = function($event) {
+            if ($event.which === 2) return;
+            var click = {x:$event.pageX, y:$event.pageY};
             var charts = $('.chart-wrapper').toArray();
             charts.forEach(function(chart) {
-                if ($(chart).find($event.relatedTarget) === undefined) {
+                var loc = chart.getBoundingClientRect();
+                loc.y = loc.y + document.documentElement.scrollTop;
+                if (click.x > loc.x && click.x < (loc.x+loc.width) && click.y > loc.y && click.y < (loc.y+loc.height)) {
+                    console.log("skipping chart");
+                } else {
                     var $el = $(chart).find('svg');
                     var offset = $el.offset();
                     var event = $.Event('mouseover', {
-                        which: 1,
-                        pageX: offset.left,
-                        pageY: offset.top
+                        which: 2,
+                        pageX: click.x,
+                        pageY: loc.y +10,
+                        bubbles: false
                     });
-                    $el.trigger(event);
+                    $timeout(function() {
+                        $el.trigger(event);
+                    }, 100);
                 }
             });
             
