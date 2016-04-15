@@ -293,7 +293,7 @@ angular.module('MetricsPage', ['LandingPage', 'CloudWatchCharts', 'EucaConsoleUt
                     var event = $.Event('mouseover', {
                         which: 2,
                         pageX: click.x,
-                        pageY: loc.y +10,
+                        pageY: document.documentElement.scrollTop + loc.y +10,
                         bubbles: false
                     });
                     $timeout(function() {
