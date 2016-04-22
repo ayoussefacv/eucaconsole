@@ -268,9 +268,7 @@ class CloudWatchMetricsJsonView(BaseView):
                             continue
                         unit = [mt['unit'] for mt in METRIC_TYPES if mt['name'] == metric[1]]
                         if cat['name'] == 'custom':
-                            unit = ['Count']
-                    if metric_name == 'UserCount':
-                        print "Hello"
+                            unit = ['None']
                     cat_metrics.append(dict(
                         cat_name=cat['name'],
                         namespace=metric[2],
@@ -318,14 +316,13 @@ class CloudWatchMetricsJsonView(BaseView):
                 names[volume.id] = TaggedItemView.get_display_name(volume)
         return dict(results=names)
 
-    @view_config(route_name='metrics_available_for_resource', renderer='json', request_method='GET')
+    @view_config(route_name='metrics_available_for_dimensions', renderer='json', request_method='GET')
     def metrics_available_for_resource(self):
-        resourcetype = self.request.matchdict.get('type')
-        resourceid = self.request.matchdict.get('value')
+        dimensions_param = self.request.params.get('dimensions', '{}')
+        dimensions = json.loads(dimensions_param)
         namespace_param = self.request.params.get('namespace', 'AWS/EC2')
         namespaces = namespace_param.split(',')  # Pass multiple namespaces as comma-separated list
         conn = self.get_connection(conn_type='cloudwatch')
-        dimensions = {resourcetype: [resourceid]}
         metrics = []
 
         # Fetch standard metrics by namespace(s)
