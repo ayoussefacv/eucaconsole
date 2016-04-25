@@ -250,6 +250,7 @@
                                 <div class="large-chart-wrapper">
                                     <i class="busy loading" ng-if="chartsCtrl.largeChartLoading"></i>
                                     <svg cloudwatch-chart="" id="large-chart-{{ metric }}" class="cwchart"
+                                         ng-mouseover="metricsCtrl.showEvent($event)"
                                          dimensions="{{ metricsCtrl.chartDimensions(chart) }}"
                                          namespace="{{ chart[0].namespace }}"
                                          metric="{{ chart[0].metric_name }}"

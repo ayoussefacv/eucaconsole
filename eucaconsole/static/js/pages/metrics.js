@@ -279,7 +279,7 @@ angular.module('MetricsPage', ['LandingPage', 'CloudWatchCharts', 'EucaConsoleUt
             });
         };
         vm.distributeMouseOver = function($event) {
-            if ($event.which === 2) return;
+            if ($event.generated !== undefined) return;
             var click = {x:$event.pageX, y:$event.pageY};
             var charts = $('.chart-wrapper').toArray();
             charts.forEach(function(chart) {
@@ -291,17 +291,24 @@ angular.module('MetricsPage', ['LandingPage', 'CloudWatchCharts', 'EucaConsoleUt
                     var $el = $(chart).find('svg');
                     var offset = $el.offset();
                     var event = $.Event('mouseover', {
-                        which: 2,
+                        which: 0,
                         pageX: click.x,
                         pageY: document.documentElement.scrollTop + loc.y +10,
-                        bubbles: false
+                        clientX: click.x,
+                        clientY: (loc.y +10) - document.documentElement.scrollTop,
+                        screenX: click.x,
+                        screenY: loc.y +10,
+                        bubbles: false,
+                        generated: true
                     });
                     $timeout(function() {
                         $el.trigger(event);
                     }, 100);
                 }
             });
-            
+        };
+        vm.showEvent = function($event) {
+            console.log($event.target.id +":"+ $event.clientX+","+$event.clientY + ($event.generated!==undefined?"(generated)":""));
         };
     })
 ;
