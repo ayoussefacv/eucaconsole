@@ -292,12 +292,18 @@ angular.module('MetricsPage', ['LandingPage', 'CloudWatchCharts', 'EucaConsoleUt
                     var offset = $el.offset();
                     var event = $.Event('mouseover', {
                         which: 0,
-                        pageX: click.x,
-                        pageY: document.documentElement.scrollTop + loc.y +10,
-                        clientX: click.x,
-                        clientY: (loc.y +10) - document.documentElement.scrollTop,
-                        screenX: click.x,
-                        screenY: loc.y +10,
+                        //pageX: click.x,
+                        //pageY: document.documentElement.scrollTop + loc.y +10,
+                        //clientX: click.x,
+                        //clientY: (loc.y +10),
+                        //screenX: click.x,
+                        //screenY: loc.y +10,
+                        pageX: $event.pageX,
+                        pageY: $event.pageY+300,
+                        clientX: $event.clientX,
+                        clientY: $event.clientY+300,
+                        screenX: $event.screenX,
+                        screenY: $event.screenY+300,
                         bubbles: false,
                         generated: true
                     });
@@ -308,7 +314,7 @@ angular.module('MetricsPage', ['LandingPage', 'CloudWatchCharts', 'EucaConsoleUt
             });
         };
         vm.showEvent = function($event) {
-            console.log($event.target.id +":"+ $event.clientX+","+$event.clientY + ($event.generated!==undefined?"(generated)":""));
+            console.log($event.target.id +": top"+document.documentElement.scrollTop+" clientxy"+ $event.clientX+","+$event.clientY + ($event.generated!==undefined?"(generated)":""));
         };
     })
 ;
