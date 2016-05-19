@@ -2,7 +2,8 @@ describe('AlarmDetailPage', function () {
     
     beforeEach(angular.mock.module('AlarmDetailPage'));
 
-    var scope, controller;
+    var scope, controller, routesHandler;
+
     var templateData = {
         alarm_json: JSON.stringify({
             "comparison": ">=",
@@ -51,7 +52,7 @@ describe('AlarmDetailPage', function () {
         }).replace(/"/g, '&quot;')
     };
 
-    beforeEach(angular.mock.inject(function ($rootScope, $compile) {
+    beforeEach(angular.mock.inject(function ($rootScope, $compile, $httpBackend) {
         scope = $rootScope.$new();
         var tmplSrc = window.__html__['templates/cloudwatch/alarms_detail.pt'];
         tmplSrc = tmplSrc.replace(/\$\{([_a-zA-Z]+)\}/g, function (match, key) {
@@ -60,7 +61,11 @@ describe('AlarmDetailPage', function () {
             }
             return match;
         });
-        var element = angular.element(tmplSrc);
+
+        var element = angular.element('<div alarm-detail="' + templateData.alarm_json + '"></div>');
+
+        routesHandler = $httpBackend.when('GET', '/static/json/routes.json')
+            .respond([]);
 
         var template = $compile(element)(scope);
         scope.$digest();
@@ -69,5 +74,6 @@ describe('AlarmDetailPage', function () {
     }));
 
     it('should blah', function () {
+        console.log(scope);
     });
 });
